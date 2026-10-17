@@ -2,6 +2,12 @@
 
 **October 17–18, 2026 | Delaware State University | 24 hours**
 
+## Current team project: Drought Relief Allocation Planner
+
+This repository now has a six-page Streamlit **scaffold** for an Iowa corn drought-relief planner. Run it from the repository root with `python -m streamlit run app.py` after installing `requirements.txt`. The Overview page shows reported Iowa corn history. Predictions, allocation amounts, validation results, and the satellite county map are still to be implemented; the app labels those pages accordingly. The [project scope](docs/PROJECT_SCOPE.md) and [repository map](docs/REPOSITORY_MAP.md) record the goal, modules, and open decisions. The starter challenge guide continues below.
+
+**AI-use disclosure so far:** OpenAI Codex helped organize this repository scaffold, page navigation, Iowa corn history filter, and project documentation. Verification so far: Python syntax compiled and the filter returned 2,574 Iowa corn rows across 99 counties, including 2,470 reported yields. A full Streamlit launch and clean-clone check are still pending. The team must review and verify any later model, allocation rule, and generated media before making claims in the app or pitch.
+
 Droughts, heat waves and unusual weather make farming harder to plan. Many people make decisions about this every season: crop insurers, extension agents, state drought programs, grain buyers. Your team picks one of them, uses 26 years of real county farm data to help them make one decision, and builds a tool that shows it.
 
 ---
@@ -251,7 +257,8 @@ If you want a question to explore before choosing a user:
 ## Repo layout
 
 ```
-app.py                          Streamlit app — run with: streamlit run app.py
+app.py                          Streamlit page navigation — run with: python -m streamlit run app.py
+app_pages/                      six project pages, Overview through Credits
 LICENSE                         MIT license for the code and docs (data credits in README)
 requirements.txt                pinned dependencies (app, notebook, modelling)
 
@@ -270,17 +277,30 @@ data/
 
 src/
 ├── data_loader.py              load_master(), load_nass_raw(), load_daily_weather(), etc.
+├── data.py                     Iowa corn history filter
+├── features.py                 August 15 feature boundary (not implemented)
+├── engine.py                   scenario loss boundary (not implemented)
+├── allocation.py               funding/allocation boundary (not implemented)
+├── render3d.py                 satellite map/3D boundary (not implemented)
+├── ui.py                       shared Streamlit helpers
 └── build/                      pipelines that built the dataset (reference only)
     └── validate_sources.py     sanity checks across all 4 sources
+
+data_processed/                 future derived feature tables
+models/                         future saved final models
+validation/                     future walk-forward backtest and results
+assets/                         future decorative media and local viewer files
 
 notebooks/
 └── starter_notebook.ipynb      load the data, worked example, places to start
 
 docs/
+├── PROJECT_SCOPE.md            team goal, moving parts, and open decisions
+├── REPOSITORY_MAP.md           purpose of major folders and files
 ├── Data to Harvest Hackathon at Delaware State University.md   event concept, judging rubric
 ├── dataset_specification.md    technical build contract — fields, filters, formulas
 ├── technical_implementation_plan.md   scope, state/crop rationale, pipeline
-└── timeline.md                 organizer prep timeline
+└── briefing/                   current student and mentor briefing
 
 .github/ISSUE_TEMPLATE/
 └── submission.yml              the submission form (see Team setup and submission)
