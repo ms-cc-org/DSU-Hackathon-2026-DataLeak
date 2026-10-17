@@ -2,7 +2,7 @@
 
 import streamlit as st
 
-from src.ui import showPending
+from web.ui import showPending
 
 
 st.title("County risk")

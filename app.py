@@ -11,12 +11,12 @@ st.set_page_config(
 
 currentPage = st.navigation(
     [
-        st.Page("app_pages/1_overview.py", title="Overview", default=True),
-        st.Page("app_pages/2_county_risk.py", title="County risk"),
-        st.Page("app_pages/3_scenarios.py", title="Scenarios"),
-        st.Page("app_pages/4_budget_allocation.py", title="Budget allocation"),
-        st.Page("app_pages/5_method_and_data.py", title="Method and data"),
-        st.Page("app_pages/6_credits.py", title="Credits"),
+        st.Page("web/pages/1_overview.py", title="Overview", default=True),
+        st.Page("web/pages/2_county_risk.py", title="County risk"),
+        st.Page("web/pages/3_scenarios.py", title="Scenarios"),
+        st.Page("web/pages/4_budget_allocation.py", title="Budget allocation"),
+        st.Page("web/pages/5_method_and_data.py", title="Method and data"),
+        st.Page("web/pages/6_credits.py", title="Credits"),
     ]
 )
 

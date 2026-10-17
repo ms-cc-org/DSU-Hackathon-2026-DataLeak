@@ -144,7 +144,7 @@ Question 6 is the one nccpi\_crop makes answerable, and it's the most defensible
 | data/data\_dictionary.md | definitions for every field, warning, and known gap |
 | data/processed/ | source panels: daily weather, weekly drought, NASS, soil, MODIS, irrigation, and per-source failure logs |
 | data/counties.geojson | simplified boundaries for mapping |
-| notebooks/starter\_notebook.ipynb | starter notebook |
+| analysis/notebooks/starter\_notebook.ipynb | starter notebook in this team repo |
 | src/build/ | the pipeline used to build the datasets |
 | src/data\_loader.py | helper functions: load\_master(), load\_daily\_weather(), load\_weekly\_drought(), load\_nass\_raw(), load\_soil(), load\_modis(), load\_irrigation(), load\_counties() |
 | app.py | optional Streamlit scaffold |

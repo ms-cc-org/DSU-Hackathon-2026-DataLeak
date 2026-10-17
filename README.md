@@ -4,7 +4,7 @@
 
 ## Current team project: Drought Relief Allocation Planner
 
-This repository now has a six-page Streamlit **scaffold** for an Iowa corn drought-relief planner. Run it from the repository root with `python -m streamlit run app.py` after installing `requirements.txt`. The Overview page shows reported Iowa corn history. Predictions, allocation amounts, validation results, and the satellite county map are still to be implemented; the app labels those pages accordingly. The [project scope](docs/PROJECT_SCOPE.md) and [repository map](docs/REPOSITORY_MAP.md) record the goal, modules, and open decisions. The starter challenge guide continues below.
+This repository now has a six-page Streamlit **scaffold** for an Iowa corn drought-relief planner. Run it from the repository root with `python -m streamlit run app.py` after installing `requirements.txt`. The Overview page shows reported Iowa corn history. Predictions, allocation amounts, validation results, and the satellite county map are still to be implemented; the app labels those pages accordingly. The [project scope](docs/PROJECT_SCOPE.md) and [architecture overview](docs/ARCHITECTURE_OVERVIEW.md) record the goal, grouped folders, modules, and open decisions. The starter challenge guide continues below.
 
 **AI-use disclosure so far:** OpenAI Codex helped organize this repository scaffold, page navigation, Iowa corn history filter, and project documentation. Verification so far: Python syntax compiled and the filter returned 2,574 Iowa corn rows across 99 counties, including 2,470 reported yields. A full Streamlit launch and clean-clone check are still pending. The team must review and verify any later model, allocation rule, and generated media before making claims in the app or pitch.
 
@@ -181,17 +181,17 @@ The first time, Streamlit asks for an email address in the terminal. Press Enter
 
 ### 4. Open the starter notebook
 
-From the repo root, with the venv active, run `jupyter lab` and open `notebooks/starter_notebook.ipynb` (or open it in VS Code and pick the `.venv` kernel). It loads the data, walks through the 2012 Iowa drought, and gives three questions to start from.
+From the repo root, with the venv active, run `jupyter lab` and open `analysis/notebooks/starter_notebook.ipynb` (or open it in VS Code and pick the `.venv` kernel). It loads the data, walks through the 2012 Iowa drought, and gives three questions to start from.
 
 No install? Open the starter notebook in Google Colab and run its first cell, which fetches the data. Colab doesn't save to your team's repository: to keep your work, download it (**File → Download → Download .ipynb**) and add it to your team's repository on GitHub (**Add file → Upload files**).
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ms-cc-org/DSU-Hackathon/blob/main/notebooks/starter_notebook.ipynb)
+[![Open the upstream starter notebook in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/ms-cc-org/DSU-Hackathon/blob/main/notebooks/starter_notebook.ipynb)
 
 ---
 
 ## Load the data in your own code
 
-The data loader handles file paths and data types for you. Run these from the repo root. From a subfolder such as `notebooks/`, add `import sys; sys.path.insert(0, "..")` first, as the starter notebook does.
+The data loader handles file paths and data types for you. Run these from the repo root. The notebook under `analysis/notebooks/` adds `../..` to its Python import path so it can import `src` when opened from that folder.
 
 If your Streamlit app is in a subfolder (for example `team_x/app.py`), start it from the repo root with `python -m streamlit run team_x/app.py`. Plain `streamlit run team_x/app.py` fails with `No module named 'src'`.
 
@@ -258,15 +258,22 @@ If you want a question to explore before choosing a user:
 
 ```
 app.py                          Streamlit page navigation — run with: python -m streamlit run app.py
-app_pages/                      six project pages, Overview through Credits
 LICENSE                         MIT license for the code and docs (data credits in README)
 requirements.txt                pinned dependencies (app, notebook, modelling)
+.env.example                    provider configuration template (no real keys)
+
+web/
+├── pages/                      six project pages, Overview through Credits
+├── assets/                     future media and local viewer files
+├── ui.py                       shared Streamlit helpers
+└── render3d.py                 satellite map/3D boundary (not implemented)
 
 data/
 ├── master_dataset.csv          the dataset (2.3 MB)
 ├── master_dataset.parquet      same data, smaller and faster (412 KB)
 ├── data_dictionary.md          every field, every warning, every known gap
 ├── counties.geojson            county boundaries for maps (253 counties)
+├── derived/                    future August 15 feature tables
 └── processed/                  source parquets (for advanced teams)
     ├── acis/                   daily county weather, 1999–2025
     ├── drought/                weekly drought severity, 2000–2025
@@ -281,22 +288,17 @@ src/
 ├── features.py                 August 15 feature boundary (not implemented)
 ├── engine.py                   scenario loss boundary (not implemented)
 ├── allocation.py               funding/allocation boundary (not implemented)
-├── render3d.py                 satellite map/3D boundary (not implemented)
-├── ui.py                       shared Streamlit helpers
 └── build/                      pipelines that built the dataset (reference only)
     └── validate_sources.py     sanity checks across all 4 sources
 
-data_processed/                 future derived feature tables
-models/                         future saved final models
-validation/                     future walk-forward backtest and results
-assets/                         future decorative media and local viewer files
-
-notebooks/
-└── starter_notebook.ipynb      load the data, worked example, places to start
+analysis/
+├── models/                     future saved final models
+├── validation/                 future walk-forward backtest and results
+└── notebooks/starter_notebook.ipynb   worked exploration and starter questions
 
 docs/
 ├── PROJECT_SCOPE.md            team goal, moving parts, and open decisions
-├── REPOSITORY_MAP.md           purpose of major folders and files
+├── ARCHITECTURE_OVERVIEW.md    purpose of each grouped folder and file
 ├── Data to Harvest Hackathon at Delaware State University.md   event concept, judging rubric
 ├── dataset_specification.md    technical build contract — fields, filters, formulas
 ├── technical_implementation_plan.md   scope, state/crop rationale, pipeline

@@ -13,10 +13,10 @@ Crop-value loss is an estimate, not an insurance claim or an official relief pay
 | Supplied data | Iowa corn yield/acreage, weekly drought, daily weather, soil, county boundaries | Present under `data/`; overview reads real Iowa corn history. |
 | August 15 features | Rebuild county/year weather and drought measures using only observations available by the decision date | Module boundary in `src/features.py`; no feature table yet. |
 | Loss engine | Fit a training-only yield trend, estimate yield shortfall, and convert it to scenario dollars using entered acres and price | Module boundary in `src/engine.py`; no trained model or prediction yet. |
-| Validation | Walk-forward test and simple baselines with counts, error, and county-priority metrics | `validation/` exists; no result yet. |
+| Validation | Walk-forward test and simple baselines with counts, error, and county-priority metrics | `analysis/validation/` exists; no result yet. |
 | Funding and allocation | Translate loss into funding need and divide a chosen fund under explicit, comparable rules | Module boundary in `src/allocation.py`; policy still undecided. |
 | User interface | History, scenarios, budget, method, and credits pages | Six pages are wired; only Overview shows descriptive data. |
-| County visualization | Satellite basemap, county overlays, and optional illustrative 3D scene | Module boundary in `src/render3d.py`; provider and viewer not selected. |
+| County visualization | Satellite basemap, county overlays, and optional illustrative 3D scene | Module boundary in `web/render3d.py`; provider and viewer not selected. |
 | Handoff | Run instructions, sources, AI-use disclosure, reproducible artifacts, pitch | README and folder placeholders exist; final handoff not complete. |
 
 ## Confirmed choices
