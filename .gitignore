@@ -1,6 +1,7 @@
 .env
 .venv
 .DS_Store
+docs/dev/
 __pycache__/
 scratch/
 data/raw/
