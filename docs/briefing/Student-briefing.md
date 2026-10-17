@@ -47,8 +47,8 @@
 
    Then pick one entry point, depending on comfort level:
 
-* **Starter notebook (most teams start here):** jupyter lab, open notebooks/starter\_notebook.ipynb. It walks through the 2012 Iowa drought, then offers a few questions (soil buffering, corn vs sorghum, rainfed vs irrigated) or bring your own idea.   
-* **Streamlit app** to build an interactive tool: streamlit run app.py. The overview tab works and shows the pattern (filter → aggregate → chart). The other tabs (Weather & Yield, Drought Analysis, Soil & Risk) are empty tabs for you to fill.  
+* **Starter notebook (most teams start here):** jupyter lab, open analysis/notebooks/starter\_notebook.ipynb in this team repo. It walks through the 2012 Iowa drought, then offers three questions to start from.
+* **Streamlit app** to build an interactive tool: python -m streamlit run app.py. In this team repo, Overview shows reported Iowa corn history and the other pages are clearly labeled scaffolds.
 * **Detailed data,** for advanced teams: daily weather (2.5M rows), weekly drought (343k rows) and soil per county. Build your own season windows, drought timing or heat during pollination.  
 * **Extensions:** *Optional*: satellite greenness (MODIS NDVI/EVI) by county and year, and irrigated share by county, crop and year (mostly Nebraska 2000-2018)
 
@@ -87,5 +87,3 @@
 | C5. Innovation | 10% | Fresh framing, analytical thinking, or novel insights beyond simple walkthroughs. |
 | C6. Demonstration & Presentation | 15% | Clear narrative arc (problem to solution) delivered within the 8-minute limit. |
 | C7. Collaboration & Teamwork | 10% | Shared ownership and meaningful participation from all team members. |
-
- 
