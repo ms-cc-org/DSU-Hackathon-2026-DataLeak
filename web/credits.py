@@ -23,6 +23,10 @@ All data is public federal data, supplied in the starter repository.
 - **MODIS:** Didan, K. (2021). MODIS/Terra Vegetation Indices 16-Day L3 Global 250m SIN Grid V061.
   NASA EOSDIS Land Processes DAAC.
 - **County boundaries:** U.S. Census Bureau county boundaries, from the plotly/datasets county GeoJSON.
+- **Satellite/aerial basemap:** U.S. Geological Survey imagery tiles from The National Map. Imagery is geographic
+  context and needs internet access; the county outline view uses local boundaries.
+- **Insurance:** USDA RMA-derived historical inputs and outcomes in the repository; model D predicts payout and
+  damaged-acre shares. Its held-out results and limitations are shown on Evidence.
 - **Crop prices:** the app uses editable assumed prices (corn \\$4.00/bu, soybeans \\$10.00/bu, winter wheat
   \\$5.50/bu, sorghum \\$4.00/bu) until a cited price source is added.
 """
@@ -54,10 +58,12 @@ All data is public federal data, supplied in the starter repository.
   prototype scenario lookup (`web/scenario_lookup.py`), the theme, and the README. Verified by running every page,
   checking numbers against the master table (for example Mahaska County corn 2012: 133.0 bu/acre, 25.0% below
   trend, D3), and a clean-clone test.
-- **OpenAI Codex:** helped organize the repository scaffold, page navigation and the Iowa corn history filter.
+- **OpenAI Codex:** helped organize the repository, integrate model D and future insurance scenarios, connect
+  model outputs to the fund workflow, add provenance and input exports, connect saved evidence and imagery maps,
+  and verify inference, allocation and app navigation.
 {"- **Higgsfield:** generated the decorative media noted above." if hasMedia else ""}
 
-Every number, chart and map in the app is computed from the supplied records or the documented lookup; the team
+Every analytical number is computed from supplied records, model D, the documented crop-loss lookup or explicit arithmetic; the team
 can explain and change any part of the code.
 """
     )

@@ -1,31 +1,23 @@
 # App pages
 
+The root `app.py` registers five connected tabs through `st.Page` and `st.navigation` in a top bar.
 
-The root `app.py` registers four tabs through `st.Page` and `st.navigation` (top bar; there is no sidebar).
-
-| Tab | File | Owner | What it shows |
-|---|---|---|---|
-| Story | `1_overview.py` | Lane 4 | Dusk hero, dataset stats, three method chapters beside the pinned drought map, evidence band, footer |
-| Explore 3D | `2_county_risk.py` | Lane 4 | The 3D viewer inline (opens at State view, one state at a time; History and Scenario modes; year card), counties ranked by expected annual loss, yearly charts |
-| Planner | `3_planner.py` | Lane 4 | County scenario for 2026-2030 (prototype lookup); no budget allocation |
-| Evidence | `5_method_and_data.py` | Lane 4 | Method and data notes, saved validation results, then the credits (`web/credits.py`) |
-
-Superseded, kept on disk and not registered: `3_scenarios.py` and `4_budget_allocation.py` (Lane 3; replaced by the
-Planner tab) and `6_credits.py` (its content is on the Evidence tab).
-
-Pages show only results computed from the supplied records or the documented prototype lookup. Anything not built yet
-shows the "Not available yet" state from `web.ui.showPending`.
-=======
-The root `app.py` registers these six Streamlit pages through `st.Page` and `st.navigation`.
-
-| Page | Owner | What it shows |
+| Tab | File | What it shows |
 |---|---|---|
-| `1_overview.py` | Lane 4 | The user, the August 15 decision, how to use the site, a real Iowa corn yield chart |
-| `2_county_risk.py` | Lane 4 | Ranked county cards, drought and cost charts by year, and the 3D viewer (Mode 1) |
-| `3_scenarios.py` | Lane 2/UI handoff | Iowa-corn historical-footprint controls and cached D-model X/Y/Z outputs, with county table and C analog years |
-| `4_budget_allocation.py` | Lane 3 | Fund split by rule and trigger |
-| `5_method_and_data.py` | Lane 4 | Filters, missing values, definitions, coverage, backtest results, limits |
-| `6_credits.py` | Lane 4 | Data sources, software, generated media, AI use |
+| Story | `1_overview.py` | Project story, dataset counts, a selectable state drought map, and evidence status. |
+| Explore 3D | `2_county_risk.py` | Historical county records, ranked cards, charts, and a 3D viewer with state and crop controls. |
+| Planner | `3_planner.py` | A county crop-value-loss scenario and a separate state fund shared across all supported crops, with county totals, crop shares, coverage and a CSV export. |
+| Insurance | `3_scenarios.py` | Actual fitted model D predictions for future scenarios, historical footprint what-ifs and replay, with exact inputs, model C analog context and provenance exports. |
+| Evidence | `5_method_and_data.py` | Prediction/assumption definitions, real saved model D metrics and baseline reports, coverage, separate lookup validation status and credits. |
 
-Pages show only results computed from the supplied records or the engine. Unfinished features say so with `web.ui.showPending`.
->>>>>>> main
+History and Planner cover California, Delaware, Iowa, Nebraska and the four dataset crops where records support them. The county selector contains the 230 counties with master records; the map has 253 boundary counties, including 23 with no master records. A missing state-crop pair or thin county history produces a clear message, not a zero loss.
+
+The state fund uses `web/allocation_data.py` to run the same prototype lookup for every boundary county and all four crops, then calls `src/allocation.py` for proportional shares with exact cent balancing. Missing estimates stay visible without calculated allocations; nearest-year fallback estimates remain included with warnings. Its form is independent of the county scenario. A crop detail filter never changes the shared fund weights. See `docs/lane3_contract.md` for the policy and columns.
+
+County, state fund and 3D scenario years default to the next calendar year within 2026–2030, using `src/projections.py` (2027 as of October 2026). The county result shows a central dollar estimate when matching history supports it, along with the historical range. Future-year estimates extend the yield trend and retain historical drought frequencies and latest acreage; they are loss projections, not future weather observations.
+
+Insurance defaults to 2026, the first year after the supplied data. It uses an assumed insured exposure year and complete historical climate footprints with the unchanged D artifact. Its direct predictions are payout share and damaged-acre share; X/Y/Z are calculations. A target-year change alone does not change D's predictions. Historical replay uses the test artifact for 2016–2025; historical footprint what-ifs use the full fit and are labeled in sample.
+
+IA/NE state fund runs attach D corn/soybean context without changing the agreed crop-loss allocation basis. The model result is available immediately on Insurance; its inputs and climate assumptions remain distinct from the crop-loss form. Allocation and payout maps offer USGS imagery with local county outlines as an offline alternative. See `docs/PREDICTION_CONTRACT.md`.
+
+Unregistered compatibility pages: `4_budget_allocation.py` reuses the state fund component and `6_credits.py` was folded into Evidence. No trained model output is silently substituted for a missing state/crop estimate.

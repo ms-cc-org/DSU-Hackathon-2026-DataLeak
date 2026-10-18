@@ -4,7 +4,7 @@
 
 ## Current team project: Drought Relief Allocation Planner
 
-A Streamlit app for a drought-relief budget officer making an **August 15** decision. The historical Overview and County risk pages cover the supplied four-state dataset; the working prediction scenario currently focuses on Iowa corn. Its headline X is estimated drought insurance payouts from an RMA-trained model. Y is estimated deductible exposure, and Z is an illustrative relief amount under a 95% coverage assumption. The [project scope](docs/PROJECT_SCOPE.md) and [architecture overview](docs/ARCHITECTURE_OVERVIEW.md) record the current scope and folder layout.
+A Streamlit app for a drought-relief budget officer making an **August 15** decision. Five connected tabs expose county history, all-crop loss scenarios and a state fund, fitted insurance model D predictions, exact inputs, imagery maps and saved evaluation reports. Crop-loss planning covers California, Delaware, Iowa and Nebraska where records support each crop. Model D covers Iowa/Nebraska corn and soybeans; it directly predicts insurance payout share and damaged-acre share. X/Y/Z and fund allocations are explicitly labeled calculations. The [prediction contract](docs/PREDICTION_CONTRACT.md), [scope](docs/PROJECT_SCOPE.md), [Lane 3 contract](docs/lane3_contract.md) and [architecture](docs/ARCHITECTURE_OVERVIEW.md) define the sources, limitations and file layout.
 
 ### Run it
 
@@ -17,28 +17,29 @@ python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
-The app opens at http://localhost:8501. No API keys and no network are needed at run time: supplied data is in `data/`, RMA model inputs are in `usda_budget_data/`, fitted inference files are in `app/model/artifacts/`, and three.js is bundled in `web/assets/viewer/vendor/`. The scenario page requires the tracked artifact files; if they are absent, run `python app/model/build_artifacts.py` once before starting Streamlit.
+The app opens at http://localhost:8501. No API keys or database are required. Numerical workflows and the bundled 3D viewer run from local data. Optional USGS imagery tiles need browser internet access; choose County outlines for an offline map. Insurance requires the saved artifacts in `app/model/artifacts/`; if absent, run `python app/model/build_artifacts.py` once. No request trains model D. Restart an existing Streamlit process after this integration so imported modules and navigation refresh.
 
 ### Tabs
 
-The app has four tabs in a top bar and no sidebar.
+The app has five tabs in a top bar and no sidebar.
 
 | Tab | What it shows | Where the numbers come from |
 |---|---|---|
-
-| **Story** | A dusk landscape hero (drawn in code), count-up dataset stats, three numbered chapters on the method beside an animated 2000-2025 drought map, one state at a time (pinned while the chapters scroll), and an evidence band | Dataset counts and weekly Drought Monitor maps; the evidence cards show "Not validated yet" until results are saved in `analysis/validation/results/` and `docs/coverage.csv` |
+| **Story** | Project story, dataset stats, historical drought map and prediction/evidence sources | Supplied records and saved model D metrics; the all-crop lookup's separate unvalidated status stays visible |
 | **Explore 3D** | The 3D viewer inline, opening at State view: an extruded map of one state at a time (the other states are hidden), a county diorama with a year card (Play, one drought-colored bar per year, a slider aligned under the bars), and a side panel with History and Scenario modes. The camera view you last picked is kept when you switch county, crop or mode; below it, counties ranked by expected annual loss with "Open in 3D" buttons and yearly charts | History: the 2000-2025 records. Scenario: the prototype lookup |
-| **Planner** | A county scenario for 2026-2030 (drought level D0-D4 or Predict) with a dollar range, loss %, level probabilities and the closest past years | Prototype lookup (`web/scenario_lookup.py`), not a validated model |
-| **Evidence** | Filters, definitions, coverage, backtest results when saved, limits, then the credits | Records and saved results |
+| **Planner** | County crop-loss scenarios and one state fund across all supported crops; model D context for supported crops, county totals, map, coverage and CSV | Historical crop-loss lookup and proportional policy arithmetic; insurance context remains separately labeled |
+| **Insurance** | Future historical-climate ensembles, historical footprint what-ifs, held-out replay, directly predicted shares, X/Y/Z, exact model inputs and provenance downloads | Prefit model D through `src/engine.py`; model C provides neighbors and a rough range for inspected inputs |
+| **Evidence** | Prediction definitions, saved insurance test metrics, baselines, actual historical errors, coverage, lookup validation status and credits | Real reports under `app/model/results/` and supplied records |
 
-`web/pages/3_scenarios.py`, `4_budget_allocation.py` and `6_credits.py` stay on disk for teammates but are not registered as tabs.
+`web/pages/3_scenarios.py` is now the active Insurance tab at `/insurance`. Only `4_budget_allocation.py` (shared fund component) and `6_credits.py` (folded into Evidence) remain unregistered.
 
-| Overview | An animated banner (drawn in code), count-up dataset stats, an animated 2000-2025 drought map of all 253 counties, the user, the decision, how to use the site | Done |
-| County risk (Mode 1) | State and crop selectors, ranked county cards (exposure, vulnerability, expected loss), drought and cost charts by year, and a **Visualize** button that opens the 3D viewer: a county diorama with a 2000-2025 year slider, a soil cutaway, and an extruded map of all four states (253 counties) | Done |
-| Scenarios (Mode 2) | Iowa-corn historical drought/weather footprint, base-year insured exposure, county and statewide X/Y/Z estimates, and analog years | Connected to the Lane 2 engine |
-| Budget allocation | Fund split under a chosen rule and trigger | Lane 3 |
-| Method and data | Filters, missing values, definitions, coverage, backtest results, limits | Done; backtest results appear once saved |
-| Credits | Data sources, software, AI use | Done |
+To see **what the model predicted**, open **Insurance → Run model D**. Future scenarios default to 2026, the first year after the dataset ends, and evaluate all historical climate seasons with equal weight on assumed insured exposure. The page identifies payout share and damaged-acre share as learned predictions, and X/Y/Z as dollar calculations. Inspect exact inputs, model C neighbors and download predictions, input rows and a JSON run manifest. This is a historical sensitivity ensemble, not a calibrated future-weather forecast. D has no year feature: identical assumptions produce identical predictions for 2026 and 2027.
+
+For a fund calculation, open **Planner → Allocate a state fund**, select a state, projected year and drought assumption, enter the fund and prices for all four crops, then calculate. Missing estimates stay visible with a reason and do not enter the fund weights; uncertain historical fallback estimates remain included with warnings. The whole fund is distributed to positive estimates with exact cent balancing. There is no loss cap, minimum award or extra drought trigger; funds above covered loss are flagged. Run `python -m unittest discover -s tests -v` for the allocation, real-data, app-form and existing engine checks.
+
+IA/NE fund calculations automatically attach model D context for corn and soybeans. These insurance predictions use a separately labeled historical climate ensemble and do not change crop-loss weights. The result is immediately inspectable on Insurance. CA/DE and wheat/sorghum retain their crop-loss workflow with explicit missing insurance coverage. Both fund allocations and insurance payouts have county maps over USGS imagery and local outline alternatives.
+
+Both Planner year selectors and the 3D scenario view default to the next calendar year within the 2026–2030 horizon (**2027 as of October 2026**). Select that year for a next-year loss estimate, then use the state fund form for its county allocations. The calculation extends yield trends and uses historical drought patterns, latest reported planted acreage and assumed prices; it does not forecast next year's weather. The county Planner shows the central dollar estimate and a historical range.
 
 
 ### AI-use disclosure
@@ -48,12 +49,12 @@ The app has four tabs in a top bar and no sidebar.
   - We confirmed that years with no reported yield show "No data", never zero.
   - We checked that the viewer loads with no console errors and holds 60 fps on an Apple M2 laptop, including the all-states map.
   - We ran a clean-clone test of the launch command.
-- **OpenAI Codex** helped organize the repository scaffold, page navigation, the Iowa corn history filter and project documentation, and connect the fitted Lane 2 engine to the Scenario page. The engine contract was checked against the saved official test predictions, and the Scenario page was inspected in a running Streamlit app.
+- **OpenAI Codex** helped organize the repo, repair frontend errors, integrate D future/historical scenarios and replay, connect model context to the state fund, expose source/input/output provenance, wire saved evidence and imagery maps, and implement functional checks. The [verification record](docs/VERIFICATION.md) documents the connected flow and limitations.
 - **Higgsfield** was planned for decorative media only, but **no media has been generated**: the account's free plan does not allow generation. The planned prompts are in [`web/assets/PROMPTS.md`](web/assets/PROMPTS.md). The app runs without these files.
 
 The Overview banner animation is drawn in code (CSS and SVG); it is decorative and labeled "Illustrative animation, not data".
 
-The team reviewed the AI-written code and can explain and change any part of it. Every number, chart and map in the app is computed from the supplied records.
+Analytical outputs come from supplied records, model D, the documented historical lookup or explicit arithmetic. Source labels identify each; imagery is background context. Functional checks do not validate future predictive accuracy.
 
 ### Credits for this project
 
@@ -318,8 +319,8 @@ requirements.txt                pinned dependencies (app, notebook, modelling)
 .env.example                    provider configuration template (no real keys)
 
 web/
-├── pages/                      the four tabs (1_overview = Story, 2_county_risk = Explore 3D, 3_planner = Planner,
-│                               5_method_and_data = Evidence) plus three superseded pages kept for teammates
+├── pages/                      five active tabs: Story, Explore 3D, Planner, Insurance and Evidence
+│                               plus two compatibility/credits pages
 ├── assets/
 │   ├── viewer/viewer.html      the three.js 3D viewer (procedural; no model files)
 │   ├── viewer/vendor/          three.js r169, bundled so the app works offline (MIT)
@@ -327,7 +328,13 @@ web/
 │   └── PROMPTS.md              prompts and status for generated media
 ├── ui.py                       design tokens, shared CSS, Story hero, stats, pending state, assets with fallback
 ├── credits.py                  credits text shown on the Evidence tab
-├── scenario_lookup.py          prototype scenario lookup (same numbers as the viewer's Scenario mode)
+├── scenario_lookup.py          shared prototype scenario lookup (same numbers as the viewer's Scenario mode)
+├── allocation_data.py          cached statewide county/crop scenarios, including unavailable combinations
+├── allocation_ui.py            state fund form, coverage, county/crop totals and CSV export
+├── insurance_data.py           cached model inference shared by Insurance and state fund context
+├── insurance_ui.py             model D controls, predicted shares, dollar calculations and input/output downloads
+├── model_evidence.py           saved official metrics, actual outcomes and reports
+├── maps.py                     result overlays on USGS imagery or local county outlines
 └── render3d.py                 county records for the viewer and the Explore 3D tab; embeds the viewer
 
 data/
@@ -348,8 +355,10 @@ src/
 ├── data_loader.py              load_master(), load_nass_raw(), load_daily_weather(), etc.
 ├── data.py                     Iowa corn history filter
 ├── features.py                 August 15 feature boundary (not implemented)
-├── engine.py                   scenario loss boundary (not implemented)
-├── allocation.py               funding/allocation boundary (not implemented)
+├── engine.py                   cached Lane 2 RMA insurance-payout engine (IA/NE corn/soybeans)
+├── insurance_scenarios.py       future climate ensembles, historical scenarios/replay and inference provenance
+├── allocation.py               proportional all-crop state fund rule with exact cent balancing
+├── projections.py              calendar-aware next-year defaults and projection labels
 └── build/                      pipelines that built the dataset (reference only)
     └── validate_sources.py     sanity checks across all 4 sources
 
@@ -361,6 +370,9 @@ analysis/
 docs/
 ├── PROJECT_SCOPE.md            team goal, moving parts, and open decisions
 ├── ARCHITECTURE_OVERVIEW.md    purpose of each grouped folder and file
+├── PREDICTION_CONTRACT.md      model targets, inputs, outputs and cross-page connections
+├── VERIFICATION.md             automated/browser verification and remaining limitations
+├── lane3_contract.md           state fund policy, units, fields and coverage handling
 ├── Data to Harvest Hackathon at Delaware State University.md   event concept, judging rubric
 ├── dataset_specification.md    technical build contract — fields, filters, formulas
 ├── technical_implementation_plan.md   scope, state/crop rationale, pipeline

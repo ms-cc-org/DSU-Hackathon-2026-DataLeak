@@ -7,6 +7,8 @@ import streamlit as st
 
 from src.data_loader import load_master
 from web.credits import renderCredits
+from web.insurance_ui import predictionDefinitions
+from web.model_evidence import renderModelEvidence
 from web.ui import eyebrow
 
 
@@ -32,7 +34,11 @@ def coverageTable() -> pd.DataFrame:
 eyebrow("EVIDENCE")
 st.title("How the numbers are made.")
 st.write("Filters, definitions, coverage, validation results and limits, then the credits. Every number in the app "
-         "comes from the supplied records or the documented prototype lookup.")
+         "comes from supplied records, the fitted insurance model D, the documented crop-loss lookup or explicit arithmetic.")
+st.subheader("What was predicted with the model?")
+st.dataframe(predictionDefinitions(), hide_index=True, width="stretch")
+st.page_link("web/pages/3_scenarios.py", label="Run model D and inspect its exact inputs", icon=":material/arrow_forward:")
+renderModelEvidence()
 
 st.subheader("The decision and the cutoff")
 st.write(
@@ -74,6 +80,18 @@ st.markdown(
 """
 )
 
+st.subheader("One state fund across all supported crops")
+st.write("The Planner distributes one user-entered fund in proportion to central estimated crop-value loss "
+         "across all supported county/crop combinations in the selected state. It uses the same prototype "
+         "lookup as the county scenario. Missing estimates are excluded from the weights and shown with a reason; "
+         "nearest-year fallback estimates remain included with warnings. County totals add their crop shares. "
+         "Cents are balanced so allocations equal the fund whenever positive losses exist; otherwise the fund "
+         "remains unallocated. The rule has no extra drought trigger, minimum award or loss cap, so a fund above "
+         "covered loss produces proportionally larger illustrative allocations and a warning. "
+         "Coverage gaps mean the loss total is not a complete statewide need estimate. The CSV preserves the "
+         "prices, acreage years, drought assumption, exclusions and allocation reasons. These allocations are "
+         "planning illustrations, not official relief payments or outputs of the separate RMA insurance model.")
+
 st.subheader("Coverage: counties with a reported yield")
 try:
     st.dataframe(coverageTable(), hide_index=True, width="stretch")
@@ -82,7 +100,7 @@ try:
 except Exception as error:
     st.warning(f"Coverage could not be computed: {error}")
 
-st.subheader("Validation: walk-forward backtest")
+st.subheader("Crop-loss lookup: separate validation status")
 results = sorted(RESULTS_DIR.glob("*.csv")) if RESULTS_DIR.exists() else []
 charts = sorted(RESULTS_DIR.glob("*.png")) if RESULTS_DIR.exists() else []
 if results or charts:
@@ -94,8 +112,8 @@ if results or charts:
         with st.expander(result.stem.replace("_", " ")):
             st.dataframe(pd.read_csv(result), hide_index=True, width="stretch")
 else:
-    st.info("The walk-forward backtest results are not saved yet. They will appear here from "
-            "analysis/validation/results/ once the backtest has run.")
+    st.info("The all-state crop-loss lookup has no saved held-out validation here. The insurance model D "
+            "test results above do not validate this separate lookup or its future projections.")
 
 st.subheader("Limits")
 st.markdown(

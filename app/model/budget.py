@@ -88,12 +88,12 @@ def neighbor_total_range(df, analog, weight="liability", lo=0.1, hi=0.9, k=1.0):
 def range_method():
     """Which range method validated best (results/range_method.json written by evaluate.py); default C."""
     f = RESULTS / "range_method.json"
-    return json.load(open(f))["method"] if f.exists() else "C"
+    return json.loads(f.read_text())["method"] if f.exists() else "C"
 
 
 def chosen_model():
     f = RESULTS / "chosen_model.json"
-    return json.load(open(f))["chosen"] if f.exists() else "B"
+    return json.loads(f.read_text())["chosen"] if f.exists() else "B"
 
 
 # ------------------------------------------------------------------ calibration
