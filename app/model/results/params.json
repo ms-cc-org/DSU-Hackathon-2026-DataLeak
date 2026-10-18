@@ -1,0 +1,13 @@
+{
+  "B": {
+    "max_iter": 400,
+    "max_depth": 3
+  },
+  "C": {
+    "k": 25,
+    "drought_weight": 1.0
+  },
+  "D": {
+    "alpha": 0.001
+  }
+}

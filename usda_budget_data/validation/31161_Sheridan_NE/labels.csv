@@ -1,0 +1,7 @@
+fips,county_name,state_alpha,crop,year,rma_year_available,insured,liability,insured_acres,avg_coverage,drought_indemnity,heat_indemnity,other_indemnity,drought_loss_acres,drought_payout_share,drought_payout_per_acre,drought_loss_acre_share,full_crop_value,out_of_pocket_drought_loss,est_drought_damage,est_drought_loss_share,relief_gap_to_95pct,yield_per_acre,yield_status,yield_drop_vs_prev5_pct,possible_out_of_pocket_loss
+31161,Sheridan County,NE,CORN,2013,True,True,21516577.0,41302.0,0.713296135234942,60162.5,54579.0,2797534.5,573.15,0.0027960999558619385,1.45664858844608,0.013877051958742918,30164998.711107522,120014.5974461594,180177.0974461594,0.005973051720364025,99084.53472368677,136.5,reported,10.18555073035925,False
+31161,Sheridan County,NE,CORN,2014,True,True,16330453.0,37708.0,0.7158338684971443,0.0,0.0,1233543.0,0.0,0.0,0.0,0.0,22813188.532536093,0.0,0.0,0.0,0.0,168.7,reported,-13.617995689655181,False
+31161,Sheridan County,NE,CORN,2015,True,True,11623025.0,34532.0,0.7193015067881704,0.0,0.0,1462707.0,0.0,0.0,0.0,0.0,16158766.373087697,0.0,0.0,0.0,0.0,154.5,reported,-2.9862684975336506,False
+31161,Sheridan County,NE,SOYBEANS,2013,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31161,Sheridan County,NE,SOYBEANS,2014,True,True,26845.0,126.0,0.75,0.0,0.0,0.0,0.0,0.0,0.0,0.0,35793.333333333336,0.0,0.0,0.0,0.0,,not_reported,,False
+31161,Sheridan County,NE,SOYBEANS,2015,True,True,55185.0,192.0,0.7344039330948026,0.0,0.0,18892.0,0.0,0.0,0.0,0.0,75142.57142857143,0.0,0.0,0.0,0.0,,not_reported,,False
