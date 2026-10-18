@@ -101,3 +101,12 @@ Removed the Evidence navigation entry, page file, Story report-card section and 
 `python -m unittest discover -s tests -p 'test_connected_app.py' -v`: **10 passed** in 14.577s, including all four remaining pages, no Evidence page links, the removed page file, reactive crop selection, numerical display reconciliation, historical modes, failure recovery and Planner handoff. Python compilation and `git diff --check` passed. No prediction settings or model artifacts changed.
 
 Live browser verification confirms exactly four navigation tabs (Story, Explore 3D, Planner, Insurance), no Evidence links on Insurance, and the cleaned Story page. The existing port 8501 app was restarted. Screenshot: `/tmp/four-tab-navigation.png`.
+
+
+## County-only Planner and fixed 2026 default — October 18, 2026
+
+Removed the “Allocate a state fund” section from the active Planner. Its heading, source text, Story chapter and Insurance link no longer promise an active fund workflow. Allocation modules remain on disk as legacy code. Planner defaults to 2026, with all year options uniformly labeled “YEAR (projected)”; 2027 no longer says “next year.” The separate 3D viewer's calendar settings are unchanged.
+
+Verification: `test_planner_ui.py` **2 passed** (2.043s), covering the 2026 default, all five year labels, absence of fund controls and displayed loss reconciliation at 2026/2027/2030. `test_connected_app.py` **10 passed** (13.614s), with the retired active fund test replaced by Planner/Insurance navigation checks. A final targeted Insurance inference/display check also passed after removing the obsolete fund row from prediction definitions. Python compilation and `git diff --check` passed. No model features, settings or artifacts changed.
+
+Live browser: `/planner` shows “Explore crop losses,” defaults to “2026 (projected),” and offers “2027 (projected)” through “2030 (projected).” The county scenario is the entire Planner; there is no state-fund form. The app was restarted on port 8501. Screenshot: `/tmp/planner-2026-default.png`.

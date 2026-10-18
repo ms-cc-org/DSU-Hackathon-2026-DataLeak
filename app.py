@@ -21,8 +21,8 @@ currentPage = st.navigation(
     [
         st.Page("web/pages/1_overview.py", title="Story", default=True),
         st.Page("web/pages/2_county_risk.py", title="Explore 3D", url_path="explore"),
-        st.Page("web/pages/3_planner.py", title="Planner", url_path="planner"),
         st.Page("web/pages/3_scenarios.py", title="Insurance", url_path="insurance"),
+        st.Page("web/pages/3_planner.py", title="Planner", url_path="planner"),
     ],
     position="top",
 )

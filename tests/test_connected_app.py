@@ -174,24 +174,16 @@ class ConnectedAppTests(unittest.TestCase):
         self.assertEqual(result["metadata"]["modelArtifact"], "d_full.joblib")
         self.assertIn("In-sample", result["metadata"]["evaluationLabel"])
 
-    def testFundCalculationConnectsInsuranceWithoutChangingItsAllocationBasis(self) -> None:
+    def testPlannerLinksToInsuranceWithoutStateFundControls(self) -> None:
         self.appTest.switch_page("web/pages/3_planner.py").run(timeout=30)
+        self.assertFalse(self.appTest.exception)
+        self.assertFalse(self.appTest.error)
+        self.assertEqual(next(widget for widget in self.appTest.selectbox if widget.label == "Year").value, 2026)
+        self.assertFalse(any(widget.label == "State fund ($)" for widget in self.appTest.number_input))
+        self.assertFalse(any(button.label == "Calculate state allocation" for button in self.appTest.button))
+        self.openInsurance()
         self.appTest.button[0].click().run(timeout=30)
-        self.assertFalse(self.appTest.exception)
-        result = self.appTest.session_state["stateFundPlan"]
-        self.assertIsNotNone(result["insuranceContext"])
-        self.assertEqual(result["summary"]["allocatedUsd"], 10_000_000)
-        self.assertEqual(set(result["countyCropTable"]["allocationRule"]), {"proportionalCropValueLoss"})
-        self.assertIn("insurancePayoutShare", result["countyCropTable"])
-        cornSoy = result["countyCropTable"]["crop"].isin(["CORN", "SOYBEANS"])
-        self.assertTrue(result["countyCropTable"].loc[cornSoy, "insurancePayoutShare"].notna().all())
-        self.assertTrue(result["countyCropTable"].loc[~cornSoy, "insurancePayoutShare"].isna().all())
-        with self.assertNoLogs("streamlit.elements.lib.policies", level="WARNING"):
-            self.appTest.switch_page("web/pages/3_scenarios.py").run(timeout=30)
-        self.assertFalse(self.appTest.exception)
-        self.assertEqual(self.appTest.session_state["insuranceResult"]["metadata"]["targetYear"], result["inputs"]["year"])
-        self.assertEqual(self.appTest.selectbox(key="insuranceTargetYear").value, result["inputs"]["year"])
-        self.assertEqual(self.appTest.selectbox(key="insuranceState").value, result["inputs"]["state"])
+        self.assertSelectedInsuranceScope({"CORN", "SOYBEANS"})
 
     def testAllFourPagesRenderWithoutRemovedEvidenceLinks(self) -> None:
         for pagePath in ("web/pages/1_overview.py", "web/pages/2_county_risk.py", "web/pages/3_planner.py",

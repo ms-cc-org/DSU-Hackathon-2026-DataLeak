@@ -120,10 +120,9 @@ with chapters:
     chapter("02", "Turn the shortfall into dollars.",
             "Estimated crop-value loss = trend yield x loss % x planted acres x price. The price is an "
             "editable assumption, and crop-value loss is not a relief payment.")
-    chapter("03", "Split a fixed fund on August 15.",
-            "Set one state fund and share it across all supported crops in proportion to estimated crop-value "
-            "loss. Review county totals, crop shares and unavailable estimates in the Planner. These are "
-            "illustrative allocations from the prototype lookup, not official relief payments.")
+    chapter("03", "Compare drought scenarios.",
+            "Choose a county, crop and year in the Planner, then change the drought level to see how "
+            "estimated crop losses change. Use Insurance to explore predicted insurance payouts.")
 with mapColumn:
     with st.container(key="stickymap"):
         try:

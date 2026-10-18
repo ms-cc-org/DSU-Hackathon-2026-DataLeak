@@ -20,7 +20,6 @@ def predictionDefinitions() -> pd.DataFrame:
         {"Quantity": "X: estimated insurance payouts", "Source": "Calculated from T1", "Unit / meaning": "USD = payout share × assumed insured liability"},
         {"Quantity": "Y: estimated deductible exposure", "Source": "Calculated from T2 and coverage", "Unit / meaning": "USD = damaged-acre share × full crop value × (1 − coverage)"},
         {"Quantity": "Z: illustrative 95% relief", "Source": "Calculated policy illustration", "Unit / meaning": "USD under a 95% coverage assumption; not a program payout forecast"},
-        {"Quantity": "State fund allocations", "Source": "Proportional rule in Planner", "Unit / meaning": "Based on the separate crop-value-loss lookup across all supported crops"},
     ])
 
 
@@ -227,4 +226,4 @@ def renderInsurancePlanner() -> None:
     except (OSError, ValueError, KeyError, IndexError) as error:
         st.session_state.pop("insuranceResult", None)
         st.error(f"Insurance inference could not run: {error}")
-    st.page_link("web/pages/3_planner.py", label="Open the all-crop loss and fund Planner", icon=":material/arrow_forward:")
+    st.page_link("web/pages/3_planner.py", label="Open the crop-loss Planner", icon=":material/arrow_forward:")

@@ -6,16 +6,15 @@
 |---|---|---|---|
 | Insurance model D | T1: drought insurance payout share; T2: drought-damaged insured-acre share | X: estimated insurance payouts; damaged acres; Y: deductible exposure; Z: illustrative relief under 95% coverage | Iowa and Nebraska; corn and soybeans; insured records only |
 | Crop-loss Planner | Historical lookup of yield loss below trend; linear projection of trend yield | Estimated crop-value loss = trend yield × loss fraction × latest planted acreage × assumed price | All supplied states and crops where history supports an estimate |
-| State fund | No learned prediction | Proportional allocation of one fund across positive crop-value-loss estimates, with integer-cent balancing | All supported crops together within the selected state |
 | Imagery map | No prediction | Geographic imagery with calculated result overlays | Supplied county boundaries; imagery requires network access |
 
-The active app has four tabs: Story, Explore 3D, Planner and Insurance. Insurance is registered at `/insurance`; it is no longer a hidden page. Story links to it, and supported state fund calculations attach its outputs with distinct column labels. The historical crop-loss lookup and the trained insurance model answer different questions and use separately disclosed assumptions.
+The active app has four tabs: Story, Explore 3D, Planner and Insurance. Insurance is registered at `/insurance`; it is no longer a hidden page. Story and the county Planner link to it. The state-fund section has been removed from Planner. The historical crop-loss lookup and the trained insurance model answer different questions and use separately disclosed assumptions.
 
 ## Insurance user inputs
 
 - Mode: future insurance scenario, historical footprint scenario, or historical replay.
 - State: IA or NE. Crop selection: corn, soybeans, or both insured crops together.
-- Future target year: 2026–2030, default **2026**, the first year after the supplied data ends. The separate crop-loss Planner defaults to the next calendar year within that same horizon.
+- Future target year: 2026–2030, default **2026**, the first year after the supplied data ends. The separate crop-loss Planner also defaults to 2026 and uses uniform projected-year labels.
 - Insured exposure base year: a saved year from 2000–2025; future scenarios default to 2025.
 - Climate assumption: repeat a selected historical season or evaluate every 2000–2025 historical season once with equal weight. Historical footprint mode uses a single historical footprint with the target year's insured exposure.
 - Positive insured-acre and insured crop-value multipliers. They scale exposure/dollar conversion after inference, not model features or learned shares. A value multiplier is not a forecast market price.
@@ -52,13 +51,9 @@ X is estimated insurance payouts, not total crop-value loss. Y is estimated dedu
 
 For a future ensemble, each county/crop's headline quantities are means across the complete historical-footprint runs. Statewide totals are summed inside each run before calculating the 10th–90th percentile spread. Individual county percentiles are not summed to manufacture a statewide interval. A single footprint has no ensemble uncertainty range.
 
-## Fund connection
+## Retained allocation code
 
-The user-confirmed fund basis remains estimated crop-value loss across all supported crops in one state. Model D insurance payouts do not replace those weights.
-
-For IA/NE fund runs, the app automatically calculates model D context for the same target year, using latest saved insured exposure and all historical climate footprints. Its two predicted shares and calculated insurance payout dollars are joined on FIPS and crop with `insurance*` labels. Wheat/sorghum insurance cells stay unavailable. CA/DE retain the all-crop fund workflow and display the insurance model's scope limitation.
-
-The fund's D0–D4/Predict drought assumption and the insurance context's historical climate ensemble are independent and explicitly labeled. These are related planning views, not two measures of the same forecast. The completed model context is available immediately on Insurance for inspection. A failure loading insurance artifacts leaves the crop-loss fund usable and displays an error for its missing insurance context.
+The state-fund section is removed from the active Planner. Allocation modules and their proportional rule remain on disk as legacy code; the active site does not collect a fund or distribute county allocations. Planner is a county/crop loss scenario tool, defaulting to 2026. Insurance remains a separate prediction workflow.
 
 ## Geography and evidence
 
@@ -87,6 +82,6 @@ Run `python -m unittest discover -s tests -v`. Tests cover original D reproducti
 
 ## Required verification for insurance/model changes
 
-A model or insurance UI change must be checked through selection → saved inference → aggregation → displayed metrics/map/table → exported predictions and assumptions. Rendering a page successfully is insufficient. Change controls **after** a result exists, without another run click, and confirm the resulting crop/state/year and values across every surface. Cover both states, corn/soybeans/all crops and future/historical-footprint/replay modes; retain failure recovery and Planner handoff checks.
+A model or insurance UI change must be checked through selection → saved inference → aggregation → displayed metrics/map/table → exported predictions and assumptions. Rendering a page successfully is insufficient. Change controls **after** a result exists, without another run click, and confirm the resulting crop/state/year and values across every surface. Cover both states, corn/soybeans/all crops and future/historical-footprint/replay modes; retain failure recovery and Planner navigation checks.
 
 `tests/test_insurance_scenarios.py` compares every county's two predicted shares directly with the frozen D artifacts, then independently calculates X/Y/Z and damaged acres from the audited exposures and documented formulas. It covers 18 mode/state/crop combinations (the future cases use all historical footprints), reconciles weighted statewide shares and verifies CSV content. `tests/test_connected_app.py` verifies the rendered metrics, county/crop table and embedded 3D payload after changing selections, plus stale-result removal on errors. Dollar comparisons use sub-cent tolerances and displayed amounts use the same whole-dollar formatting as the UI. These checks establish faithful presentation of the model output, not future forecast accuracy.

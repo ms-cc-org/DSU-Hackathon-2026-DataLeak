@@ -1,6 +1,6 @@
 # Architecture overview
 
-This document describes the **current repository layout** after grouping related files. The root `app.py` launches four connected tabs. Planner keeps the all-state/all-crop loss lookup and agreed fund rule; Insurance exposes fitted model D with auditable future/historical scenarios, replay and source labels. Supported fund runs attach insurance context. Insurance uses a 3D county payout map; fund maps offer USGS imagery or local county outlines. Saved model reports remain in the repository.
+This document describes the **current repository layout** after grouping related files. The root `app.py` launches four connected tabs. Planner provides county/crop loss scenarios with a 2026 default; Insurance exposes fitted model D with auditable future/historical scenarios, replay and source labels. The state-fund UI is no longer embedded in Planner; allocation modules remain as legacy code. Insurance uses a 3D county payout map; fund maps offer USGS imagery or local county outlines. Saved model reports remain in the repository.
 
 ## How the pieces connect
 
@@ -10,7 +10,7 @@ app.py → web/pages/ → web/render3d.py → src/data_loader.py → data/
                     → web/allocation_ui.py → web/allocation_data.py → web/scenario_lookup.py
                                            → src/allocation.py (pure proportional fund rule)
 Insurance → web/insurance_ui.py → web/insurance_data.py → src/insurance_scenarios.py → src/engine.py
-Planner fund → web/insurance_data.py → model D context joined by FIPS/crop
+Legacy fund code (not active) → web/insurance_data.py → insurance context
 src/engine.py → app/model/artifacts/ ← app/model/build_artifacts.py
 Insurance replay → web/model_evidence.py → saved historical outcomes
 result maps → web/maps.py → local county geometry + public USGS imagery (optional network)
@@ -41,9 +41,9 @@ result maps → web/maps.py → local county geometry + public USGS imagery (opt
 | `web/pages/` | Holds four active tab scripts and two unregistered compatibility/credits pages. |
 | `web/pages/1_overview.py` | Displays the project story, dataset counts and an animated state-selectable historical drought map. |
 | `web/pages/2_county_risk.py` | Shows state/crop county rankings, yearly charts and a 3D viewer for historical records across the supplied dataset. |
-| `web/pages/3_planner.py` | Runs the county crop-value-loss scenario for 2026–2030 and embeds the separate state fund workflow. Both use the historical prototype lookup with visible coverage limits. |
+| `web/pages/3_planner.py` | Runs a county/crop loss scenario for 2026–2030, defaulting to 2026 with uniform projected-year labels. The state-fund section is removed. |
 | `web/pages/3_scenarios.py` | Active Insurance entry point at `/insurance`. Delegates to the shared model UI for future ensembles, historical footprint what-ifs and replay. |
-| `web/pages/4_budget_allocation.py` | Unregistered compatibility page that calls the same state fund component embedded in Planner. It contains no separate allocation logic. |
+| `web/pages/4_budget_allocation.py` | Unregistered legacy page that calls the retained state-fund component. It is not linked or embedded in the active Planner. |
 | `web/pages/6_credits.py` | Unregistered legacy credits page; current project credits are in README.md. |
 | `web/pages/README.md` | Describes the four active tabs, cross-page connections and differing analytical coverage. |
 | `web/credits.py` | Retains source, tool and AI-use credit content for the unregistered legacy credits page. |
@@ -51,7 +51,7 @@ result maps → web/maps.py → local county geometry + public USGS imagery (opt
 | `web/render3d.py` | Builds historical county data and embeds the bundled three.js viewer. Its county scene is illustrative; it has no satellite imagery tiles. |
 | `web/scenario_lookup.py` | Computes the historical drought-level lookup and crop-value-loss range for one county/crop. The county Planner and bulk allocation adapter share the same record extraction and calculation. |
 | `web/allocation_data.py` | Builds cached state scenarios across every supplied boundary county and all four crops using the existing lookup. Missing combinations remain explicit with reasons, warnings, acreage years and price assumptions. |
-| `web/allocation_ui.py` | Collects a state fund and all-crop scenario assumptions and renders county totals, crop shares, missing-data explanations and a CSV download. It retains the last calculated snapshot in Streamlit session state. |
+| `web/allocation_ui.py` | Retained legacy UI, not embedded in the active app. Collects a state fund and all-crop scenario assumptions and renders county totals, crop shares, missing-data explanations and a CSV download. It retains the last calculated snapshot in Streamlit session state. |
 | `web/insurance_ui.py` | Renders reactive Insurance selections, the statewide payout total above the 3D county map, predicted shares and calculated X/Y/Z. Selection changes after the initial run refresh every result view and discard stale output on failure. Model identity remains in source/input breakdowns and provenance downloads. |
 | `web/insurance_map.py` | Joins completed insurance predictions to all supplied state counties and aggregates selected crops with exposure-weighted shares. Embeds the 3D map using the existing bundled three.js runtime. |
 | `web/assets/viewer/insurance_map.html` | Draws the interactive 3D state payout map with county heights, orbit/zoom, aerial/reset views, hover values and a county/crop breakdown. Missing estimates remain grey and WebGL failures leave the numerical tables usable. |
@@ -74,7 +74,7 @@ result maps → web/maps.py → local county geometry + public USGS imagery (opt
 | `src/engine.py` | Loads fitted D/C artifacts once and exposes stable `predict`, `scenario`, and `replay` contracts for insured payout and budget illustrations. |
 | `src/insurance_scenarios.py` | Adapts the unchanged D engine to future historical-footprint ensembles, historical what-ifs and replay with exact input/provenance records. It averages complete runs and calculates spread from statewide totals per run. |
 | `src/allocation.py` | Pure proportional allocation of one state fund across positive county/crop loss estimates. It validates inputs, balances integer cents, preserves unavailable rows and rolls up counties and crops. |
-| `src/projections.py` | Chooses the next calendar year as the default when it is within the supported horizon and labels projected years consistently. The county Planner, state fund form and 3D scenario view share these calendar settings. |
+| `src/projections.py` | Chooses the next calendar year as the default when it is within the supported horizon and labels projected years consistently. The 3D viewer and legacy state fund form use these calendar settings; Planner now independently defaults to 2026 with uniform projected labels. |
 | `src/build/` | Holds organizer scripts that collected, joined, and checked the supplied dataset. They are reference/pipeline code, not required for the app's current read path. |
 | `src/build/NASS_data_pull.py` | Pulls USDA NASS crop yield and acreage records for the source dataset. |
 | `src/build/ACIS_data_pull.py` | Pulls the daily county weather panel from NOAA ACIS. |
@@ -148,10 +148,10 @@ result maps → web/maps.py → local county geometry + public USGS imagery (opt
 | `tests/test_engine.py` | Checks artifact reproduction, scenario nonnegativity, out-of-range flags, and dollar scaling using standard-library unittest. |
 | `tests/test_allocation.py` | Checks proportional all-crop shares, county/crop totals, exact cent balancing, zero and missing losses, uncapped funds and rejected inputs. |
 | `tests/test_allocation_data.py` | Checks actual coverage in all four states, agreement with the single-county Planner, price changes, drought fallback flags and missing acreage. |
-| `tests/test_allocation_ui.py` | Uses Streamlit AppTest through the active navigation to test form submissions for all four states, display-only crop filtering and recalculation. |
+| `tests/test_planner_ui.py` | Verifies the 2026 default, consistent year labels, removal of fund controls and displayed loss amounts after year changes. |
 | `tests/test_projections.py` | Checks calendar year defaults, 2027 projected yield and dollar conversion, and next-year allocation/CSV output for every state. These check functionality rather than predictive accuracy. |
 | `tests/test_insurance_scenarios.py` | Checks D reproduction, climate replacement, scenario scaling, replay and auditable exports. An 18-case mode/state/crop matrix independently reconciles county shares, X/Y/Z and CSV values with the frozen artifacts and formulas. |
-| `tests/test_connected_app.py` | Exercises all four pages and the fund-to-insurance handoff using Streamlit AppTest. After-run selection tests reconcile metrics, county/crop tables and the 3D payload; failed refreshes must remove stale results and recover. |
+| `tests/test_connected_app.py` | Exercises all four pages and the Planner-to-Insurance link using Streamlit AppTest. After-run selection tests reconcile metrics, county/crop tables and the 3D payload; failed refreshes must remove stale results and recover. |
 | `tests/test_maps.py` | Checks supplied boundaries, unavailable values, imagery attribution/layer order and the local outline alternative. |
 
 ## Documentation and local planning

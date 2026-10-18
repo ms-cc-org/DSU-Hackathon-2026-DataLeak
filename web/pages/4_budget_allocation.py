@@ -1,4 +1,4 @@
-"""Unregistered compatibility page; the active Planner embeds this same state fund UI."""
+"""Legacy state fund page, retained on disk but not registered or embedded in Planner."""
 
 from web.allocation_ui import renderStateFundPlanner
 
