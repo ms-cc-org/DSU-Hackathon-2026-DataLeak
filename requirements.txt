@@ -11,7 +11,7 @@ pyarrow==25.0.1         # parquet read/write
 # Insurance inference and imagery maps reuse the modelling/Plotly pins below.
 # The insurance 3D map reuses bundled three.js and standard-library json/pathlib; no new Python dependency.
 # Reactive Insurance controls and model/display reconciliation tests reuse Streamlit, numpy/pandas and unittest.mock.
-# County Planner controls, four-page navigation and replay comparisons use these same dependencies.
+# HARVEST branding, county Planner controls, navigation and replay comparisons use these same dependencies.
 streamlit==1.65.0
 plotly==7.1.0           # interactive charts in streamlit
 matplotlib==3.11.2      # static charts, pandas df.plot()

@@ -47,7 +47,7 @@ All data is public federal data, supplied in the starter repository.
     st.write("The Story hero landscape and the banner motion are drawn in code (SVG and CSS). They are decorative and never data.")
     if hasMedia:
         st.write("Some images or video were generated with Higgsfield. They are decorative illustrations, never data. "
-                 "Prompts and settings are in `web/assets/PROMPTS.md`.")
+                 "Include their provenance in the project README.")
     else:
         st.write("No AI-generated media is included in this version.")
 

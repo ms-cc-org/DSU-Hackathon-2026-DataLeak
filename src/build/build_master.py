@@ -165,7 +165,7 @@ for name, df in [("NASS", nass), ("ACIS", acis), ("USDM", usdm), ("SSURGO", soil
 
 # ── 2. County backbone ───────────────────────────────────────────────
 # Derived from USDM (all 253 counties with fips, county_name, state_alpha).
-# See docs/dataset_specification.md section 1 (Backbone).
+# See data/data_dictionary.md for the county/crop row universe.
 
 section("2 · County backbone (from USDM)")
 

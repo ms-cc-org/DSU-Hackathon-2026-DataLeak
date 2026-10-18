@@ -1,7 +1,6 @@
 # Drought cost model
 
-Predicts, from what is known on Aug 15, what a drought costs each Iowa / Nebraska county (corn, soybeans) and turns it into a budget picture. This file documents the model code;
-the repo's main README.md is untouched. Decisions are logged, in order, in [DECISIONS.md](DECISIONS.md); the external audit is in [results/AUDIT_REPORT.md](results/AUDIT_REPORT.md).
+Predicts, from what is known on Aug 15, what a drought costs each Iowa / Nebraska county (corn, soybeans) and turns it into a budget picture. This file documents the original model code and evaluation protocol. Decisions are logged, in order, in [DECISIONS.md](DECISIONS.md); the external audit is in [results/AUDIT_REPORT.md](results/AUDIT_REPORT.md).
 
 **Wording.** X = estimated insurance payouts (predicted payout share x insured liability). Y = estimated deductible exposure. Z = illustrative relief allocation under a 95% coverage
 assumption (inspired by USDA ERP 2022); it is not a prediction of any program payment.
@@ -20,7 +19,7 @@ python app/model/iowa_corn_slice.py            # report Iowa corn only from save
 `final_test.py` refuses to run without `--i-am-sure`; `data.load_split("testing")` raises otherwise. Run it as a script (`python -m app.model...` does not work: `app/` is not a package
 and the root `data/` folder would shadow `data.py`). Data folder: `$USDA_DATA_DIR`, else `<repo>/usda_budget_data`, else `<repo>/app/usda_budget_data`. `usda_budget_data/testing/` is gitignored.
 
-The official test has already produced `results/test_predictions.csv` and `results/test_report.md` in this checkout. The ignored testing input folder is absent here. `build_artifacts.py` recreates its August 15 inputs from the checked-in source panels, joins the saved test output for exposure and observed labels, and fails if D's IA 2023 or NE 2022 statewide X differs from the saved official predictions by $1 or more. `results/test_state_years.csv` is generated from those saved predictions as a numeric reference. The app imports only `src.engine`, which loads artifacts once and never fits during a request. See [the contract](../../docs/lane2_contract.md).
+The official test has already produced `results/test_predictions.csv` and `results/test_report.md` in this checkout. The ignored testing input folder is absent here. `build_artifacts.py` recreates its August 15 inputs from the checked-in source panels, joins the saved test output for exposure and observed labels, and fails if D's IA 2023 or NE 2022 statewide X differs from the saved official predictions by $1 or more. `results/test_state_years.csv` is generated from those saved predictions as a numeric reference. The app imports only `src.engine`, which loads artifacts once and never fits during a request. See [the HARVEST prediction contract](../../docs/engineering/predictions.md).
 
 ## Models
 

@@ -1,3 +1,3 @@
-# Validation
+# Research validation
 
-Place walk-forward backtest code and its reproducible results here. Each test year must use only earlier training years and features available by August 15. Compare the final method with simple baselines and keep reported sample counts. No result exists yet.
+This folder is reserved for additional research checks. HARVEST's saved insurance evaluations are in `app/model/results/`. New decision-time evaluations must fit on earlier years and enforce the August 15 cutoff; see the [verification guide](../../docs/engineering/verification.md).

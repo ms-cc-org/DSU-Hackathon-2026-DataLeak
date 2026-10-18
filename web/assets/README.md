@@ -1,12 +1,11 @@
-# Assets
+# HARVEST assets
 
-| Path | What it is |
+| Path | Purpose |
 |---|---|
-| `viewer/viewer.html` | The 3D viewer (three.js). Every shape and texture is generated in code. `web/render3d.py` fills in the data and the import map. |
-| `viewer/insurance_map.html` | Insurance 3D state map: extruded counties from completed payout predictions, county selection and crop breakdown; populated by `web/insurance_map.py`. |
-| `viewer/vendor/` | three.js r169 (`three.module.min.js`, `OrbitControls.js`, `BufferGeometryUtils.js`) with its MIT `LICENSE`, bundled so the viewer works without a network. Downloaded unchanged from `https://cdn.jsdelivr.net/npm/three@0.169.0/`. |
-| `media/` | Optional decorative images and video (Higgsfield). None are included yet; see `PROMPTS.md`. |
-| `PROMPTS.md` | Prompts, settings and status for generated media. |
+| `brand.svg` | Website icon with the HARVEST accessibility label. |
+| `viewer/viewer.html` | Historical/illustrative 3D scenes populated by `web/render3d.py`. |
+| `viewer/insurance_map.html` | Completed insurance predictions displayed as extruded county shapes. |
+| `viewer/vendor/` | Bundled three.js r169 and helpers; preserve its MIT `LICENSE`. |
+| `media/` | Optional decorative files; none are included. Missing media never blocks the app. |
 
-Generated media is decorative and labeled as illustrative; it is never analytical evidence. A missing
-media file never breaks a page.
+Numerical results come from data/model payloads, not decorative assets. Source and font credits are in the [README](../../README.md); module responsibilities are in the [architecture](../../docs/engineering/architecture.md).

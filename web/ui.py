@@ -95,7 +95,7 @@ GLOBAL_CSS = f"""
 [data-testid="stHeaderLogo"] {{ height: 34px; width: 34px; }}
 div:has(> [data-testid="stHeaderLogo"]), a:has(> [data-testid="stHeaderLogo"]), button:has(> [data-testid="stHeaderLogo"]) {{ display: flex; align-items: center; gap: 10px; text-decoration: none; }}
 div:has(> [data-testid="stHeaderLogo"])::after, a:has(> [data-testid="stHeaderLogo"])::after,
-button:has(> [data-testid="stHeaderLogo"])::after {{ content: "Drought Relief Planner"; font-family: var(--display);
+button:has(> [data-testid="stHeaderLogo"])::after {{ content: "HARVEST"; font-family: var(--display);
   font-weight: 700; font-size: 1.05rem; color: var(--text); white-space: nowrap; }}
 [data-testid="stTopNavLink"] {{ border-radius: 999px; border: 1px solid var(--line); min-height: 44px; padding: 0 18px;
   display: inline-flex; align-items: center; transition: background .2s ease, color .2s ease; }}

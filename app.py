@@ -12,7 +12,7 @@ from web.ui import applyStyle
 
 
 st.set_page_config(
-    page_title="Drought Relief Planner",
+    page_title="HARVEST",
     page_icon=":material/agriculture:",
     layout="wide",
 )
