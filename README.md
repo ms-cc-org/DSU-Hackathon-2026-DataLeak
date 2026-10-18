@@ -122,7 +122,7 @@ Each direction names a user, their decision, and what success means. Pick one, c
 
 ### 1. Get your team's repository
 
-Each team works in its own public GitHub repository under the official DSU Hackathon organization ([ms-cc-org](https://github.com/ms-cc-org)), made from the [starter project](https://github.com/ms-cc-org/DSU-Hackathon). Use the team repository the organizers give you, for example `DSU-Hackathon-Team-alpha`; don't work directly in the shared starter repository. [Get set up](#get-set-up) shows how to download it.
+Each team works in its own public GitHub repository under the official DSU Hackathon organization ([ms-cc-org](https://github.com/ms-cc-org)), made from the [starter project](https://github.com/ms-cc-org/DSU-Hackathon). Use the team repository the organizers give you, for example `DSU-Hackathon-2026-DataLeak`; don't work directly in the shared starter repository. [Get set up](#get-set-up) shows how to download it.
 
 Your team repository already has the starter files. Add your code, notebooks, documentation and other deliverables to it. It is public, so never commit passwords or API keys.
 
