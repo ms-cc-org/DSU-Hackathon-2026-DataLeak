@@ -106,7 +106,7 @@ st.markdown(
 - Drought explains only part of yield loss: some large losses (for example Mahaska County corn in 2010)
   came in years without D2+ drought.
 - The scenario numbers come from a prototype lookup of similar past years (`web/scenario_lookup.py`), not a
-  validated model. It is not a weather forecast, and its "Predict" option is a model estimate from 2000-2025 history.
+  validated model. The user picks the drought level; nothing predicts drought or weather.
 - Data ends in 2025.
 """
 )
