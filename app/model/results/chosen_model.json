@@ -13,7 +13,7 @@
       "drought_weight": 1.0
     },
     "D": {
-      "alpha": 0.01
+      "alpha": 0.001
     }
   },
   "frozen_models": [
@@ -52,8 +52,8 @@
     },
     {
       "model": "D",
-      "drought_stat_abs_err": 334282159.8033003,
-      "capture_all": 0.5282524968978849,
+      "drought_stat_abs_err": 230977363.3000647,
+      "capture_all": 0.5291975414999859,
       "beats_B3_and_B4": true
     }
   ]

@@ -20,31 +20,33 @@ import pandas as pd
 
 from data import RESULTS, add_year_class, load_usable
 from evaluate import (BASELINES, CANDIDATES, LABEL, MODELS, RANGED, SIG_SHARE, add_z, apply_k, attach_range, budget_range_rows, f_amt, f_pct, fit_predict, history,
-                      k_table, known_misses, md, metrics, range_rows, state_year_points, summary_md, trigger_agreement, two_by_two)
+                      k_table, known_misses, largest_misses, md, metrics, range_rows, state_year_points, summary_md, trigger_agreement, two_by_two)
 
-OFFICIAL = "Version 1 – official test, model frozen before seeing test data"
-DISCLOSURE = ("Disclosure: some 2016–2025 years appeared in earlier exploratory analyses (2018/2022 payout totals, early 2022/2023 budget tests). "
-              "The headline model was chosen by the pre-declared rule on walk-forward + validation only (DECISIONS.md, Entries 3-4).")
+OFFICIAL = "Official test – model frozen before seeing test data; some test years appeared in earlier exploratory analyses (see DECISIONS.md)."
+DISCLOSURE = ("The headline model (D) was chosen by the pre-declared rule on walk-forward + validation only and frozen in DECISIONS.md (Entries 3-7) before this run. "
+              "Earlier exploratory analyses touched some 2016-2025 years (2018/2022 payout totals, early 2022/2023 budget tests); nothing from them was used to choose or tune any model.")
 
 
-def verdict_text(M, hl):
+def verdict_text(M, hl, bud):
+    """3-5 plain sentences: headline vs current practice (B2a binary trigger, B2b tiered trigger)."""
     g = lambda grp, m, col: M[(M.target == "t1") & (M.group == grp) & (M.model == m)][col].iloc[0]
-    better = {}
-    for grp in ("all", "drought"):
-        for trig in ("B2a", "B2b"):
-            better[(grp, trig)] = (g(grp, hl, "stat_abs_err") < g(grp, trig, "stat_abs_err"), g(grp, hl, "capture_top20") > g(grp, trig, "capture_top20"))
-    err_wins = sum(v[0] for v in better.values())
-    cap_wins = sum(v[1] for v in better.values())
-    kind = ("a clear win" if err_wins == 4 and cap_wins == 4 else "a loss" if err_wins == 0 and cap_wins == 0 else "mixed")
-    s = []
-    for grp, name in (("drought", "drought state-years"), ("all", "all state-years")):
-        s.append(f"On {name}, {LABEL[hl]} has a statewide absolute error of {f_amt(g(grp, hl, 'stat_abs_err'), '$')} against {f_amt(g(grp, 'B2a', 'stat_abs_err'), '$')} for B2a and "
-                 f"{f_amt(g(grp, 'B2b', 'stat_abs_err'), '$')} for B2b, top-20 capture {f_pct(g(grp, hl, 'capture_top20'), 1)} against {f_pct(g(grp, 'B2a', 'capture_top20'), 1)} and "
-                 f"{f_pct(g(grp, 'B2b', 'capture_top20'), 1)} (best possible {f_pct(g(grp, hl, 'best_capture'), 1)}), and under-budgets by {f_amt(g(grp, hl, 'under_budget_total'), '$')} in total "
-                 f"against {f_amt(g(grp, 'B2a', 'under_budget_total'), '$')} and {f_amt(g(grp, 'B2b', 'under_budget_total'), '$')}.")
-    s.append(f"Against the current-practice triggers the result is **{kind}** (lower error in {err_wins} of 4 comparisons, higher capture in {cap_wins} of 4; comparisons are drought / all state-years x B2a / B2b); "
-             f"B1 (statewide absolute error {f_amt(g('all', 'B1', 'stat_abs_err'), '$')}, capture {f_pct(g('all', 'B1', 'capture_top20'), 1)} over all state-years) is a sanity check only.")
-    s.append(f"The headline model's worst single state-year shortfall is {f_amt(g('all', hl, 'worst_shortfall'), '$')} (B2a {f_amt(g('all', 'B2a', 'worst_shortfall'), '$')}, B2b {f_amt(g('all', 'B2b', 'worst_shortfall'), '$')}).")
+    has_dr = ((M.target == "t1") & (M.group == "drought") & (M.model == hl)).any()
+    wins = {(grp, trig): (g(grp, hl, "stat_abs_err") < g(grp, trig, "stat_abs_err"), g(grp, hl, "capture_top20") > g(grp, trig, "capture_top20"))
+            for grp in (("all", "drought") if has_dr else ("all",)) for trig in ("B2a", "B2b")}
+    n = len(wins)
+    err_w, cap_w = sum(v[0] for v in wins.values()), sum(v[1] for v in wins.values())
+    kind = "a clear win" if err_w == n and cap_w == n else "a loss" if err_w == 0 and cap_w == 0 else "a mixed result"
+    ny = int(g("all", hl, "state_years"))
+    s = [f"Across the {ny} test state-years, the {LABEL[hl]} budget for a state was off by {f_amt(g('all', hl, 'stat_abs_err'), '$')} on average, against {f_amt(g('all', 'B2a', 'stat_abs_err'), '$')} for the USDA binary trigger (B2a) "
+         f"and {f_amt(g('all', 'B2b', 'stat_abs_err'), '$')} for the tiered trigger (B2b)."]
+    if has_dr:
+        s.append(f"In the drought years alone that average miss was {f_amt(g('drought', hl, 'stat_abs_err'), '$')} for {LABEL[hl]} versus {f_amt(g('drought', 'B2a', 'stat_abs_err'), '$')} and {f_amt(g('drought', 'B2b', 'stat_abs_err'), '$')}, "
+                 f"and it left {f_amt(g('drought', hl, 'under_budget_total'), '$')} of payouts un-budgeted against {f_amt(g('drought', 'B2a', 'under_budget_total'), '$')} and {f_amt(g('drought', 'B2b', 'under_budget_total'), '$')}.")
+    s.append(f"For finding where the money goes, {LABEL[hl]}'s top 20 counties held {f_pct(g('all', hl, 'capture_top20'), 1)} of actual payouts versus {f_pct(g('all', 'B2a', 'capture_top20'), 1)} and "
+             f"{f_pct(g('all', 'B2b', 'capture_top20'), 1)} for the triggers (a perfect ranking would hold {f_pct(g('all', hl, 'best_capture'), 1)}).")
+    s.append(f"Its worst single state-year shortfall was {f_amt(g('all', hl, 'worst_shortfall'), '$')} (B2a {f_amt(g('all', 'B2a', 'worst_shortfall'), '$')}, B2b {f_amt(g('all', 'B2b', 'worst_shortfall'), '$')}), and its rough "
+             f"scenario range contained the actual statewide payout in {int(bud.inside.sum())} of {len(bud)} state-years.")
+    s.append(f"Against current practice this is **{kind}**: lower statewide error in {err_w} of {n} comparisons and better top-20 capture in {cap_w} of {n} (comparisons: {', '.join(f'{a}/{t}' for a, t in wins)}).")
     return " ".join(s)
 
 
@@ -74,7 +76,9 @@ def run_final(train_splits, eval_split, out_dir, allow_test=False, label=OFFICIA
     pts = state_year_points(cal, "t1")
     bud = budget_range_rows(cov, pts[pts.model == hl].set_index(["state_alpha", "year"]).pred, method)
     cls = add_year_class(cal).drop_duplicates(["state_alpha", "year"]).set_index(["state_alpha", "year"]).sy_class
-    misses, _ = known_misses(pts, cal.groupby(["state_alpha", "year"]).liability.sum())
+    liab = cal.groupby(["state_alpha", "year"]).liability.sum()
+    misses, _ = known_misses(pts, liab)
+    own_misses = largest_misses(pts, liab, hl)
     cd, pr = trigger_agreement(cal, hl)
     tbl, note = two_by_two(cd, LABEL[hl])
 
@@ -94,10 +98,12 @@ def run_final(train_splits, eval_split, out_dir, allow_test=False, label=OFFICIA
     for (s, y), b in bud.sort_index(level=["state", "year"]).iterrows():
         row = {"state": s, "year": y, "type": cls[(s, y)], "actual X $M": f"{b.actual / 1e6:,.1f}"}
         p = pts[(pts.state_alpha == s) & (pts.year == y)].set_index("model").pred
-        for m in [hl, "B2a", "B2b"] + [x for x in CANDIDATES if x != hl]:
+        for m in [hl, "B2a"]:
             row[LABEL[m] + " $M"] = f"{p[m] / 1e6:,.1f}"
-        row["budget range $M"] = f"{b.budget_low / 1e6:,.1f}–{b.budget_high / 1e6:,.1f}"
+        row[f"{LABEL[hl]} scenario range $M"] = f"{b.budget_low / 1e6:,.1f}–{b.budget_high / 1e6:,.1f}"
         row["actual vs range"] = "inside ✓" if b.inside else "outside ✗"
+        for m in ["B2b"] + [x for x in CANDIDATES if x != hl]:
+            row[LABEL[m] + " $M"] = f"{p[m] / 1e6:,.1f}"
         rows.append(row)
     rc = []
     for m in RANGED:
@@ -106,73 +112,89 @@ def run_final(train_splits, eval_split, out_dir, allow_test=False, label=OFFICIA
             x = x if grp == "all" else x[x.sy_class == grp]
             rc.append({"model": LABEL[m], "state-years": grp, "n": len(x), "inside": int(x.inside.sum()), "coverage": f_pct(x.inside.mean()) if len(x) else "–",
                        "mean width": f_amt(x.width.mean(), "$") if len(x) else "–", "actual above upper bound": int(x.upper_miss.sum()), "actual below lower bound": int(x.lower_miss.sum())})
-    text = f"""# Final test report ({years}): {label}
+    order = [hl, "B2a", "B2b", "A", "B", "C", "B1", "B3", "B4", "Z0"]
+    order = [m for m in order if m in MODELS] + [m for m in MODELS if m not in order]
+    def tab(t, grp, unit="$", ranged=False):
+        d = sel(t, grp)
+        return summary_md(d, unit, order, ranged=ranged) if (d.model == hl).any() else "No such state-years in this window."
+    n_all = int(sel("t1", "all").state_years.iloc[0])
+    text = f"""# Official test report ({years})
+
+**{label}**
 
 {DISCLOSURE}
 
-**Headline model: {LABEL[hl]}** (chosen by the pre-declared rule on walk-forward + validation: {cfg['reason']}). Candidates A, B, C, D and the baselines (Z0 predict zero, B1 bin average, B2a USDA binary trigger,
-B2b tiered LFP-style trigger, B3 liability only, B4 liability x D2+ last map) were trained on 2000-2015 ({len(train)} rows) and predict {len(test)} rows. Calibration is nested (k for a year uses only earlier years,
-including the test years already passed; applied only where evaluate.py found it helpful). **X** = estimated insurance payouts, **Y** = estimated deductible exposure, **Z** = illustrative relief allocation under a 95%
-coverage assumption (inspired by USDA ERP 2022). Drought state-years in this window (actual statewide payout >= 3% of insured $): {drought_list}. The "historical scenario range" is the rough 10th-90th percentile of past outcomes;
-the budget range is the `{method}` range widened to contain the headline model's point estimate. Metric definitions are in `validation_report.md`.
+**Headline model: {LABEL[hl]}, uncalibrated** (alpha {params['D']['alpha']}; rule: {cfg['reason']}). Secondary, reported in full: A, B, C. Baselines: Z0 (predict zero), B1 (drought-bin average), B2a (USDA binary trigger), B2b (tiered LFP-style trigger),
+B3 (liability only), B4 (liability x D2+ last map). All models were trained on {int(train.year.min())}-{int(train.year.max())} ({len(train)} rows) and predict {len(test)} rows. Calibration is nested (the multiplier for a year uses only earlier years, including the test
+years already passed) and was applied only to A, B4 and B3's T2, as decided on walk-forward + validation. **X** = estimated insurance payouts, **Y** = estimated deductible exposure, **Z** = illustrative relief allocation under a 95%
+coverage assumption (inspired by USDA ERP 2022). Metric definitions are in `validation_report.md`.
 
-## 1. Headline vs current USDA practice (B2a, B2b)
-**All state-years** ({int(sel('t1', 'all').state_years.iloc[0])})
+**Which state-years count as drought, and why.** A state-year is a *drought state-year* when the actual statewide drought payout was at least 3% of insured dollars. This grouping rule was fixed before any test result existed and is
+used only to split the tables. In 2016-2025 that gives {int(sel('t1', 'drought').state_years.iloc[0]) if (sel('t1', 'drought').model == hl).any() else 0} drought state-year(s): {drought_list}; the other {n_all - (int(sel('t1', 'drought').state_years.iloc[0]) if (sel('t1', 'drought').model == hl).any() else 0)} are quiet.
 
-{summary_md(sel('t1', 'all'), '$', [hl, 'B2a', 'B2b'])}
+## 1. Headline table: {LABEL[hl]} vs B2a and B2b first, then A, B, C and B1, B3, B4, Z0 (T1: X, estimated insurance payouts)
+Statewide abs. error = mean over state-years of |Σ predicted - Σ actual|; Under-budgeted = Σ over state-years of max(0, actual - predicted); Worst shortfall = largest single state-year shortfall; County WAPE and Top-20 capture over counties (crops summed); Σpred/Σactual < 1 under-budgets.
 
-**Drought state-years only**
+**All state-years ({n_all})**
 
-{summary_md(sel('t1', 'drought'), '$', [hl, 'B2a', 'B2b']) if (sel('t1', 'drought').model == hl).any() else 'No drought state-years in this window.'}
-
-## 2. All models, T1 (X)
-**All state-years**
-
-{summary_md(sel('t1', 'all'), '$')}
+{tab('t1', 'all', ranged=True)}
 
 **Drought state-years only**
 
-{summary_md(sel('t1', 'drought'), '$') if (sel('t1', 'drought').model == hl).any() else 'No drought state-years in this window.'}
+{tab('t1', 'drought', ranged=True)}
 
 **Quiet state-years only**
 
-{summary_md(sel('t1', 'quiet'), '$') if (sel('t1', 'quiet').model == hl).any() else 'No quiet state-years in this window.'}
+{tab('t1', 'quiet', ranged=True)}
 
-## 3. T2 (damaged acres) and Z (illustrative relief allocation)
+## 2. Statewide X per state-year ($M)
+D's scenario range = the historical scenario range of C (look-alike spread, calibrated like C) widened where needed so that {LABEL[hl]}'s point estimate lies inside it; rough 10th-90th percentile of past outcomes.
+
+{md(pd.DataFrame(rows))}
+
+Historical scenario range coverage by model (own ranges, before widening):
+
+{md(pd.DataFrame(rc))}
+
+The widened range around {LABEL[hl]}'s point contained the actual in {int(bud.inside.sum())} of {len(bud)} state-years; the point was inside C's raw range in {int(bud.point_inside.sum())}.
+
+## 3. T2 (damaged acres) and Z (illustrative relief allocation, 95% coverage assumption)
 **T2, all state-years**
 
-{summary_md(sel('t2', 'all'), 'acres', ranged=False)}
+{tab('t2', 'all', 'acres')}
+
+**T2, drought state-years only**
+
+{tab('t2', 'drought', 'acres')}
 
 **Z, all state-years**
 
-{summary_md(sel('z', 'all'), '$', ranged=False)}
+{tab('z', 'all', '$')}
 
 **Z, drought state-years only**
 
-{summary_md(sel('z', 'drought'), '$', ranged=False) if (sel('z', 'drought').model == hl).any() else 'No drought state-years in this window.'}
+{tab('z', 'drought', '$')}
 
-## 4. Statewide X per state-year ($M)
-{md(pd.DataFrame(rows))}
+## 4. Trigger agreement (B2a vs {LABEL[hl]}; significant payout = share >= {SIG_SHARE:.0%} of insured value)
+{LABEL[hl]} flags its top N counties per state-year, N = the number of counties B2a makes eligible that state-year.
 
-## 5. Historical scenario range coverage
-{md(pd.DataFrame(rc))}
-
-Budget range ({method} widened around {LABEL[hl]}'s point estimate): actual inside in {int(bud.inside.sum())} of {len(bud)} state-years; the point estimate was inside the raw range in {int(bud.point_inside.sum())}.
-
-## 6. Trigger agreement (B2a vs {LABEL[hl]}, significant payout = share >= {SIG_SHARE:.0%})
 {md(pr.reset_index().rename(columns={'index': 'flagging rule'}))}
 
 {md(tbl)}
 
 {note}
 
-## 7. Known misses
-State-years where B1 and all four candidates were off by more than 50% (statewide X):
+## 5. Known misses
+State-years where B1 and all four candidates (A, B, C, D) were off by more than 50% (statewide X):
 
 {md(misses) if len(misses) else 'None.'}
 
-## 8. Verdict vs current USDA practice
-{verdict_text(M, hl)}
+{LABEL[hl]}'s five largest dollar misses:
+
+{md(own_misses)}
+
+## 6. Verdict vs current practice (B2a / B2b)
+{verdict_text(M, hl, bud)}
 """
     (out_dir / "test_report.md").write_text(text)
     return text

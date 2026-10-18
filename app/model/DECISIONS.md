@@ -198,3 +198,30 @@ gitignored. Evaluation was run with the Entry 3-4 protocol. The headline model c
 section 1 for the rule table). The audit report is copied to `results/AUDIT_REPORT.md`. `final_test.py` has not been run; it waits for the user's go-ahead. Nothing is committed.
 
 ---
+
+## Entry 6: written 2026-10-18 00:36 EDT (system clock), before the alpha edge check was run
+
+Instruction (user): check D's chosen alpha; if it is at either edge of the grid, extend the grid one step in that direction (x10 or /10), rerun the walk-forward selection for D only, record the
+result, and say whether the chosen alpha or the headline numbers changed; if it is not at an edge, confirm that. Facts at writing: the committed grid is alpha in {0.01, 0.1, 1.0} and the chosen
+alpha is 0.01, i.e. the LOWER edge. Plan fixed now: extend the grid by one step to {0.001, 0.01, 0.1, 1.0} and re-tune D only (criterion unchanged: pooled county-year dollar WAPE of T1 over
+walk-forward 2006-2012, uncalibrated); B's and C's grids and choices are untouched. If the chosen alpha changes, the evaluation is regenerated so params.json, calibration, the headline table
+and the reports are consistent. Only one step is taken even if the new edge value wins. If the pre-declared headline rule would then pick a model other than D, the final test does not run:
+the user is asked first. `final_test.py` has not been run and no 2016-2025 result exists.
+
+---
+
+## Entry 7: written 2026-10-18 00:38 EDT (system clock): alpha edge check done; headline frozen
+
+**Alpha check.** D's chosen alpha was 0.01, the lower edge of the grid {0.01, 0.1, 1.0}. The grid was extended one step to {0.001, 0.01, 0.1, 1.0} and the walk-forward selection rerun
+(pooled county-year dollar WAPE of T1, uncalibrated): 0.001 -> 0.5845, 0.01 -> 0.5865, 0.1 -> 0.6797, 1.0 -> 0.9929. **The chosen alpha changed to 0.001**; the curve is flat at the bottom (0.002 WAPE
+between the two smallest values), and 0.001 is the new lower edge. As instructed, the grid is not extended further. Only D's rows changed (B, C, A and all baselines are identical).
+D, pooled 2006-2015, all state-years: statewide abs. error $71.4M -> $57.1M, under-budgeted $1,061M -> $755M, worst shortfall $483M -> $417M, county WAPE 0.652 -> 0.657, top-20 capture 52.8% -> 52.9%,
+Σpred/Σactual 0.85 -> 0.92. Drought state-years only: statewide abs. error $334M -> $231M, capture 44.2% -> 43.2%. Validation: statewide abs. error $95.8M -> $86.5M, capture 49.3% -> 47.0%.
+The pre-declared headline rule still picks D (drought-year error $231M vs C $445M, A $457M, B $470M; all four beat B3 and B4 on capture), and nested calibration still does not help D (T1 raw $57.1M vs $127.9M calibrated;
+T2 likewise), so D stays uncalibrated.
+
+**Headline frozen: D (Tweedie GLM), uncalibrated. Secondary, reported in full: A, B, C. Baselines: Z0, B1, B2a, B2b, B3, B4. Range: C's historical scenario range widened around D's point.**
+Frozen settings: `results/params.json` (B: max_iter 400, max_depth 3; C: k 25, drought weight 1.0; D: alpha 0.001), `results/calibration.csv` (nested calibration only for A, B4, and B3's T2), `results/chosen_model.json`,
+`results/range_method.json` (C). `final_test.py` has not been run at the time of writing; it is run once after the commit that contains this entry, and nothing is changed after it runs.
+
+---

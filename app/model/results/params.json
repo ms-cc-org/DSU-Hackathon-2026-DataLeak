@@ -8,6 +8,6 @@
     "drought_weight": 1.0
   },
   "D": {
-    "alpha": 0.01
+    "alpha": 0.001
   }
 }
