@@ -1064,20 +1064,19 @@ function lossForBucket(hist, b) {
   let basis = matches, warning = null;
   if (b < minB || b > maxB) {
     warning = `${SB_LEVELS[b]} is outside this county's history by Aug 15 (${SB_LEVELS[minB]}-${SB_LEVELS[maxB]}). ` +
-      'Showing the nearest 3 historical years instead of a confident number.';
+      'The estimate is the average of the nearest 3 historical years, so treat it with caution.';
     basis = nearest;
   } else if (matches.length < 2) {
     warning = `Only ${matches.length} past year(s) reached exactly ${SB_LEVELS[b]} by Aug 15. ` +
-      'Showing the nearest 3 historical years instead of a confident number.';
+      'The estimate is the average of the nearest 3 historical years, so treat it with caution.';
     basis = nearest;
   }
-  // With enough matching years: their median. In a fallback there is no confident number, so the
-  // headline shows only the range; the scene and the Predict weighting use the nearest years' average.
+  // One estimate: the median of matching years, or the average of the nearest 3 years (with a warning).
+  // Same method as web/scenario_lookup.py, so the Planner shows the same number.
   const losses = basis.map((h) => h.loss);
   const confident = !warning;
   const mid = confident ? median(losses) : losses.reduce((s, v) => s + v, 0) / losses.length;
-  return { mid, low: Math.min(...losses), high: Math.max(...losses), n: basis.length,
-    nearest, warning, confident, matches: matches.length };
+  return { mid, n: basis.length, nearest, warning, confident, matches: matches.length };
 }
 
 function runEngine() {
@@ -1096,23 +1095,10 @@ function runEngine() {
   const acres = projected ? latestAcres : (Y.acres[i] ?? latestAcres);
   const dollars = (p) => (acres == null ? null : trendYield * p / 100 * acres * sb.price);
 
-  if (sb.level !== 'Predict') {
-    const b = SB_LEVELS.indexOf(sb.level);
-    const r = lossForBucket(hist, b);
-    return { ...r, bucket: b, trendYield, acres, dollars, projected, warnings: r.warning ? [r.warning] : [] };
-  }
-
-  // Predict: share of 2000-2025 years at each level by Aug 15 -> probability of each level.
-  const counts = [0, 0, 0, 0, 0];
-  hist.forEach((h) => { counts[h.bucket] += 1; });
-  const probs = counts.map((k) => k / hist.length);
-  const perLevel = SB_LEVELS.map((_, b) => lossForBucket(hist, b));
-  const mid = probs.reduce((s, p, b) => s + p * perLevel[b].mid, 0);
-  const low = probs.reduce((s, p, b) => s + p * perLevel[b].low, 0);
-  const high = probs.reduce((s, p, b) => s + p * perLevel[b].high, 0);
-  const likely = probs.indexOf(Math.max(...probs));
-  return { mid, low, high, n: hist.length, nearest: perLevel[likely].nearest, warnings: [], bucket: likely,
-    probs, trendYield, acres, dollars, projected, predict: true, confident: true };
+  // The user picks the drought level; nothing predicts drought.
+  const b = SB_LEVELS.indexOf(sb.level);
+  const r = lossForBucket(hist, b);
+  return { ...r, bucket: b, trendYield, acres, dollars, projected, warnings: r.warning ? [r.warning] : [] };
 }
 
 function renderSandbox() {
@@ -1132,46 +1118,27 @@ function renderSandbox() {
   const sev = sevOfBucket(r.bucket);
   worldA.setTarget({
     values: { present: 1, noData: 0, health: look.health, bonus: 0, severity: sev, gauge: sev, aws: c.aws ?? 0 },
-    gaugeText: `Drought level: ${SB_LEVELS[r.bucket]}${r.predict ? ' (most likely)' : ''}`,
+    gaugeText: `Drought level: ${SB_LEVELS[r.bucket]}`,
     waterText: waterText(c.aws),
     statusText: null,
   });
 
-  const costLabel = projected ? 'Predicted cost of the drought' : 'Estimated dollars';
-  const predictBlock = !r.predict ? '' : `
-    <h3>Model estimate</h3>
-    <div class="warn small">Model estimate from 2000-2025 history - not a weather forecast.</div>
-    <div class="small">Most likely level by Aug 15: <b>${SB_LEVELS[r.bucket]}</b></div>
-    <div class="bars small">${r.probs.map((p, b) => `<div class="bar"><span style="width:24px">${SB_LEVELS[b]}</span>
-      <div class="track"><div class="fill" style="width:${(100 * p).toFixed(0)}%"></div></div>
-      <span style="width:36px;text-align:right">${(100 * p).toFixed(0)}%</span></div>`).join('')}</div>
-    <div class="small muted">Share of ${r.n} years (2000-2025) at each peak drought level by Aug 15. Expected loss
-      = probability-weighted loss across levels; the range weights each level's low and high the same way.</div>`;
-
+  const basis = r.confident ? `the median of ${r.n} past years at ${SB_LEVELS[r.bucket]}` : 'the average of the nearest 3 historical years';
   $('sbOutput').innerHTML = `
     ${r.warnings.map((w) => `<div class="warn small">${w}</div>`).join('')}
-    <div class="muted small">Expected loss</div>
-    ${r.confident
-      ? `<div class="big">${r.mid.toFixed(1)}% below trend</div>
-         <div class="small">Range ${r.low.toFixed(1)}% to ${r.high.toFixed(1)}%</div>`
-      : `<div class="big">${r.low.toFixed(1)}% to ${r.high.toFixed(1)}%</div>
-         <div class="small">Range of the nearest years only (no confident estimate)</div>`}
-    <div class="muted small" style="margin-top:8px">${costLabel}</div>
-    ${r.confident
-      ? `<div class="big">${money(r.dollars(r.mid))}</div>
-         <div class="small">Range ${money(r.dollars(r.low))} to ${money(r.dollars(r.high))}</div>`
-      : `<div class="big" style="font-size:16px">${money(r.dollars(r.low))} to ${money(r.dollars(r.high))}</div>`}
+    <div class="muted small">Estimated crop-value loss</div>
+    <div class="big">${money(r.dollars(r.mid))}</div>
+    <div class="small">Estimated loss ${r.mid.toFixed(1)}% below the county trend, from ${basis}.</div>
     <div class="small muted" style="margin-top:4px">${fmt(r.trendYield)} bu/acre trend yield x loss % x
       ${r.acres == null ? 'No data' : Math.round(r.acres).toLocaleString('en-US')} planted acres
       ${projected ? '(latest reported) ' : ''}x $${sb.price.toFixed(2)}/bu (assumed). An estimated crop loss, not program payout.</div>
-    ${predictBlock}
     <h3>Closest 3 historical years</h3>
     <table class="kv small">
       <tr class="muted"><td>Year</td><td>Drought level</td><td style="text-align:right">Actual loss</td></tr>
       ${r.nearest.map((h) => `<tr><td>${h.year}</td><td>${SB_LEVELS[h.bucket]}</td><td>${h.loss.toFixed(1)}%</td></tr>`).join('')}
     </table>
     <div class="small muted" style="margin-top:8px">Engine: past ${cropName(sb.crop).toLowerCase()} years in this county
-      whose peak drought level ${SEASON_TEXT[sb.crop]} matches the selected level; median loss, range = min to max.
+      whose peak drought level ${SEASON_TEXT[sb.crop]} matches the selected level; the estimate is their median loss.
       Loss = yield below the county's 2000-2025 linear trend. No machine learning.</div>`;
 }
 
@@ -1210,10 +1177,7 @@ function buildSandboxPanel() {
     $('sbPriceLabel').textContent = `${cropName(crop)} price ($/bushel) - assumed price, replace with a cited source`;
   };
   const fillLevels = () => {
-    const projected = sb.year > LAST;
-    if (!projected && sb.level === 'Predict') sb.level = 'D2';
-    $('sbLevel').innerHTML = SB_LEVELS.map((l, b) => `<option value="${l}">${l} (${LEVEL_WORDS[b + 1]}${b === 0 ? ' or none' : ''})</option>`).join('') +
-      (projected ? '<option value="Predict">Predict (model estimate)</option>' : '');
+    $('sbLevel').innerHTML = SB_LEVELS.map((l, b) => `<option value="${l}">${l} (${LEVEL_WORDS[b + 1]}${b === 0 ? ' or none' : ''})</option>`).join('');
     $('sbLevel').value = sb.level;
   };
   $('sbCounty').value = sb.fips;
