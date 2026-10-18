@@ -13,3 +13,7 @@ test.py
 suggestions.md
 .vscode
 .ipynb_checkpoints/
+# Secrets: any .env variant except the documented template
+.env.*
+!.env.example
+.streamlit/secrets.toml

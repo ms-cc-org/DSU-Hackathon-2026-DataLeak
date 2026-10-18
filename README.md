@@ -4,9 +4,49 @@
 
 ## Current team project: Drought Relief Allocation Planner
 
-This repository now has a six-page Streamlit **scaffold** for an Iowa corn drought-relief planner. Run it from the repository root with `python -m streamlit run app.py` after installing `requirements.txt`. The Overview page shows reported Iowa corn history. Predictions, allocation amounts, validation results, and the satellite county map are still to be implemented; the app labels those pages accordingly. The [project scope](docs/PROJECT_SCOPE.md) and [architecture overview](docs/ARCHITECTURE_OVERVIEW.md) record the goal, grouped folders, modules, and open decisions. The starter challenge guide continues below.
+A Streamlit app for an Iowa drought-relief budget officer deciding, on **August 15**, how to split a fixed relief fund across counties. It shows how often severe drought hits each county, how much corn yield it loses when it does, and what that costs (an estimated crop loss, not a program payout). The [project scope](docs/PROJECT_SCOPE.md) and [architecture overview](docs/ARCHITECTURE_OVERVIEW.md) record the plan and the folder layout.
 
-**AI-use disclosure so far:** OpenAI Codex helped organize this repository scaffold, page navigation, Iowa corn history filter, and project documentation. Verification so far: Python syntax compiled and the filter returned 2,574 Iowa corn rows across 99 counties, including 2,470 reported yields. A full Streamlit launch and clean-clone check are still pending. The team must review and verify any later model, allocation rule, and generated media before making claims in the app or pitch.
+### Run it
+
+You need Python 3.11 or newer. From the repository root:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+The app opens at http://localhost:8501. No API keys and no network are needed at run time: all data is in `data/`, and three.js is bundled in `web/assets/viewer/vendor/`.
+
+### Pages
+
+| Page | What it shows | Status |
+|---|---|---|
+| Overview | The user, the decision, how to use the site, a real yield chart | Done |
+| County risk (Mode 1) | Ranked county cards (exposure, vulnerability, expected loss), drought and cost charts by year, and a **Visualize** button that opens the 3D viewer: a county diorama with a 2000-2025 year slider, a soil cutaway, and an extruded Iowa state map | Done |
+| Scenarios (Mode 2) | Expected loss for a county, crop, year up to 2030 and drought level | Lane 3 page; the 3D sandbox is ready in `web/render3d.py` |
+| Budget allocation | Fund split under a chosen rule and trigger | Lane 3 |
+| Method and data | Filters, missing values, definitions, coverage, backtest results, limits | Done; backtest results appear once saved |
+| Credits | Data sources, software, AI use | Done |
+
+### AI-use disclosure
+
+- **Claude Code (Anthropic)** helped write the 3D viewer (`web/assets/viewer/viewer.html`, `web/render3d.py`), the County risk, Overview, Method and data, and Credits pages, `web/ui.py`, and this README. How we verified it:
+  - We ran every page and checked numbers against the master table. For example, Mahaska County corn 2012 shows 133.0 bu/acre, 25.0% below trend, and a D3 drought level.
+  - We confirmed that years with no reported yield show "No data", never zero.
+  - We checked that the viewer loads with no console errors and holds about 60 fps.
+  - We ran a clean-clone test of the launch command.
+- **OpenAI Codex** helped organize the repository scaffold, page navigation, the Iowa corn history filter and the project documentation. It was verified by compiling the code and checking that the filter returned 2,574 Iowa corn rows across 99 counties (2,470 reported yields).
+- **Higgsfield** was planned for decorative media only, but **no media has been generated**: the account's free plan does not allow generation. The planned prompts are in [`web/assets/PROMPTS.md`](web/assets/PROMPTS.md). The app runs without these files.
+
+The team reviewed the AI-written code and can explain and change any part of it. Every number, chart and map in the app is computed from the supplied records.
+
+### Credits for this project
+
+The data credits are in [Credits](#credits) below. We also use [three.js](https://threejs.org) r169 (MIT license, bundled), [Streamlit](https://streamlit.io), [pandas](https://pandas.pydata.org), [NumPy](https://numpy.org), [Plotly](https://plotly.com/python/) and [scikit-learn](https://scikit-learn.org). Crop prices are editable assumptions (corn $4.00/bu, soybeans $10.00/bu) until a cited source is added.
+
+---
 
 Droughts, heat waves and unusual weather make farming harder to plan. Many people make decisions about this every season: crop insurers, extension agents, state drought programs, grain buyers. Your team picks one of them, uses 26 years of real county farm data to help them make one decision, and builds a tool that shows it.
 
@@ -264,9 +304,13 @@ requirements.txt                pinned dependencies (app, notebook, modelling)
 
 web/
 ├── pages/                      six project pages, Overview through Credits
-├── assets/                     future media and local viewer files
-├── ui.py                       shared Streamlit helpers
-└── render3d.py                 satellite map/3D boundary (not implemented)
+├── assets/
+│   ├── viewer/viewer.html      the three.js 3D viewer (procedural; no model files)
+│   ├── viewer/vendor/          three.js r169, bundled so the app works offline (MIT)
+│   ├── media/                  optional decorative media (none yet)
+│   └── PROMPTS.md              prompts and status for generated media
+├── ui.py                       shared labels, styling, price input, assets with fallback
+└── render3d.py                 county records for the viewer and the County risk page; embeds the viewer
 
 data/
 ├── master_dataset.csv          the dataset (2.3 MB)
