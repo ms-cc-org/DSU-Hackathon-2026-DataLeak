@@ -40,7 +40,7 @@ TOP_N, TIE_BAND, MIN_POOL_YEARS, SIG_SHARE = 20, 0.05, 3, 0.02
 DEFAULT_PARAMS = {"B": {"max_iter": 200, "max_depth": 3}, "C": {"k": 25, "drought_weight": 2.0}, "D": {"alpha": 0.1}}
 TUNE_GRID = {"B": {"max_iter": [100, 200, 400], "max_depth": [3, 4]},
              "C": {"k": [10, 25, 50], "drought_weight": [1.0, 2.0, 3.0]},
-             "D": {"alpha": [0.01, 0.1, 1.0]}}
+             "D": {"alpha": [0.001, 0.01, 0.1, 1.0]}}
 SPEC = {"t1": {"weight": "liability", "actual": "drought_indemnity", "unit": "$", "name": "T1 payout share (X, estimated insurance payouts)"},
         "t2": {"weight": "insured_acres", "actual": "drought_loss_acres", "unit": "acres", "name": "T2 damaged-acre share"},
         "z": {"weight": "_one", "actual": "relief_gap_to_95pct", "unit": "$", "name": "Z illustrative relief allocation (95% coverage assumption)"}}
@@ -350,6 +350,20 @@ def drought_facts_ia2013():
             "trig_apr": t_apr, "trig_jun": t_jun, "n_ia": n_ia}
 
 
+def miss_reason(s, y, direction, share, actual, facts=None):
+    """One-line likely reason for a state-year miss (direction: over / under / mixed; share = actual payout as a share of insured $)."""
+    if (s, y) == ("IA", 2013) and facts:
+        return (f"An emerging drought: D1+ covered {facts['d1_aug13']:.0f}% of Iowa by Aug 13 (D2+ {facts['d2_aug13']:.0f}%) and it intensified after the forecast date "
+                f"(D2+ {facts['d2_aug27']:.0f}% on Aug 27, {facts['d2_sep10']:.0f}% on Sep 10). Known limitation: not tuned for.")
+    if direction == "over" and share < 0.03:
+        return (f"Quiet year: actual payout only {share:.2%} of insured $ (${actual / 1e6:,.1f}M), so a small absolute miss is a large % miss; models likely over-read mild drought signals.")
+    if direction == "over":
+        return "Over-predicted: the Aug-15 drought signals were stronger than the losses that followed."
+    if direction == "under":
+        return "Loss not visible in Aug-15 inputs (late-season drought or a loss coded to another cause)."
+    return "Models disagree in sign; payout depends on local conditions the Aug-15 inputs only weakly capture."
+
+
 def known_misses(pts, liab):
     """State-years where A, B, C, D and B1 were ALL off by more than 50% (T1 payout $), with a one-line likely reason."""
     miss_models = ["B1"] + CANDIDATES
@@ -360,20 +374,24 @@ def known_misses(pts, liab):
     facts = drought_facts_ia2013()
     rows = []
     for (s, y), r in bad.iterrows():
-        share = act[(s, y)] / liab[(s, y)]
         direction = "over" if (r > 0).all() else "under" if (r < 0).all() else "mixed"
-        if (s, y) == ("IA", 2013) and facts:
-            reason = (f"An emerging drought: D1+ covered {facts['d1_aug13']:.0f}% of Iowa by Aug 13 (D2+ {facts['d2_aug13']:.0f}%) and it intensified after the forecast date "
-                      f"(D2+ {facts['d2_aug27']:.0f}% on Aug 27, {facts['d2_sep10']:.0f}% on Sep 10). Known limitation: not tuned for.")
-        elif direction == "over":
-            reason = (f"Quiet year: actual payout only {share:.2%} of insured $ (${act[(s, y)] / 1e6:,.1f}M), so a small absolute miss is a large % miss; models likely over-read mild drought signals.")
-        elif direction == "under":
-            reason = "Loss not visible in Aug-15 inputs (late-season drought or a loss coded to another cause)."
-        else:
-            reason = "Models disagree in sign; payout depends on local conditions the Aug-15 inputs only weakly capture."
         rows.append({"state": s, "year": y, "actual $M": act[(s, y)] / 1e6, "direction": direction,
-                     **{LABEL[m] + " $M": w.loc[(s, y), m] / 1e6 for m in miss_models}, "likely reason": reason})
+                     **{LABEL[m] + " $M": w.loc[(s, y), m] / 1e6 for m in miss_models},
+                     "likely reason": miss_reason(s, y, direction, act[(s, y)] / liab[(s, y)], act[(s, y)], facts)})
     return pd.DataFrame(rows), facts
+
+
+def largest_misses(pts, liab, model, n=5):
+    """The model's n largest absolute statewide-X misses with direction and a one-line likely reason."""
+    p = pts[pts.model == model].assign(err=lambda d: d.pred - d.actual)
+    p = p.reindex(p.err.abs().sort_values(ascending=False).index).head(n)
+    facts = drought_facts_ia2013()
+    rows = []
+    for r in p.itertuples():
+        direction = "over" if r.err > 0 else "under"
+        rows.append({"state": r.state_alpha, "year": r.year, "actual $M": r.actual / 1e6, f"{LABEL[model]} $M": r.pred / 1e6, "miss $M": r.err / 1e6,
+                     "direction": direction, "likely reason": miss_reason(r.state_alpha, r.year, direction, r.actual / liab[(r.state_alpha, r.year)], r.actual, facts)})
+    return pd.DataFrame(rows)
 
 
 def state_year_points(frame, t="t1", names=MODELS):
