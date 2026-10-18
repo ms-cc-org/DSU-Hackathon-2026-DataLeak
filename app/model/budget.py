@@ -71,15 +71,16 @@ def total_range(df, pred, pool, weight="liability", exclude_year=None, lo=0.1, h
     return {s: (float(t[s].quantile(lo)), float(t[s].quantile(hi))) for s in t.columns}
 
 
-def neighbor_total_range(df, analog, weight="liability", lo=0.1, hi=0.9):
+def neighbor_total_range(df, analog, weight="liability", lo=0.1, hi=0.9, k=1.0):
     """{state: (low, high)} from Strategy C's neighbour spread: every county at the same (10th / 90th) quantile of
-    its look-alikes' liability-weighted shares, i.e. counties assumed to be hit together. `analog` is a fitted Analog."""
+    its look-alikes' liability-weighted shares, i.e. counties assumed to be hit together. `analog` is a fitted Analog;
+    k is C's calibration factor (the quantiles are scaled like C's point predictions)."""
     q_lo, q_hi = analog.quantiles(df, lo, hi)
     w = df[weight].to_numpy(float)
     out = {}
     for s in sorted(df.state_alpha.unique()):
-        k = (df.state_alpha == s).to_numpy()
-        out[s] = (float((q_lo * w)[k].sum()), float((q_hi * w)[k].sum()))
+        m = (df.state_alpha == s).to_numpy()
+        out[s] = (float((k * q_lo * w)[m].sum()), float((k * q_hi * w)[m].sum()))
     return out
 
 
@@ -89,15 +90,66 @@ def range_method():
     return json.load(open(f))["method"] if f.exists() else "C"
 
 
-def statewide_range(df, analog=None, t1_pred=None, pool=None):
-    """Statewide payout range with the best-calibrated validated method. Always label it as rough.
-    C needs a fitted Analog; A / B need their predictions t1_pred and a residual pool (residual_pool(...))."""
-    m = range_method()
+def chosen_model():
+    f = RESULTS / "chosen_model.json"
+    return json.load(open(f))["chosen"] if f.exists() else "B"
+
+
+# ------------------------------------------------------------------ calibration
+def load_calibration():
+    """results/calibration.csv: one multiplier k per model x target (t1 = payout share, t2 = damaged-acre share), fitted by
+    evaluate.py as sum(actual) / sum(predicted) on walk-forward predictions 2006-2012 only."""
+    f = RESULTS / "calibration.csv"
+    if not f.exists():
+        return {}
+    c = pd.read_csv(f)
+    return {(r.model, r.target): float(r.k) for r in c.itertuples()}
+
+
+def get_k(model, target="t1"):
+    return load_calibration().get((model, target), 1.0)
+
+
+def calibrate(pred, model, target="t1"):
+    """Predicted share x the model's calibration factor k (not clipped: clip to [0, 1] when turning into amounts)."""
+    return np.asarray(pred, float) * get_k(model, target)
+
+
+def calibrated_components(df, t1_pred, t2_pred, model):
+    """budget_components() on raw model predictions after applying that model's calibration factors."""
+    return budget_components(df, calibrate(t1_pred, model, "t1"), calibrate(t2_pred, model, "t2"))
+
+
+def statewide_total(df, share_pred, weight="liability"):
+    """{state: amount} = sum of clip(share, 0, 1) x weight over the state's rows."""
+    amt = pd.Series(np.clip(np.asarray(share_pred, float), 0, 1) * df[weight].to_numpy(float), index=df.index)
+    return amt.groupby(df.state_alpha).sum().to_dict()
+
+
+def widen_to_include(rng, point):
+    """Widen {state: (low, high)} so each state's point estimate lies inside. Returns (new range, {state: widened?})."""
+    out, widened = {}, {}
+    for s, (lo, hi) in rng.items():
+        out[s] = (min(lo, point[s]), max(hi, point[s]))
+        widened[s] = out[s] != (lo, hi)
+    return out, widened
+
+
+def statewide_range(df, analog=None, preds=None, pool=None, point_model=None):
+    """Statewide payout range for the budget: the best-calibrated validated method (range_method.json), around the chosen
+    model's calibrated point estimate, widened if that point falls outside it. Always label it rough.
+      preds: {model: RAW T1 share predictions for df} for the chosen model (and the range method's model if A or B);
+             k factors are applied here.
+      analog: a fitted Analog (needed when the method is C).
+      pool: residual_pool(...) built from CALIBRATED walk-forward predictions (needed when the method is A or B)."""
+    m, point_model, preds = range_method(), point_model or chosen_model(), preds or {}
+    point = statewide_total(df, calibrate(preds[point_model], point_model, "t1"))
     if m == "C":
-        r = neighbor_total_range(df, analog)
+        rng = neighbor_total_range(df, analog, k=get_k("C", "t1"))
     else:
-        r = total_range(df, t1_pred, pool)
-    return {"method": m, "label": RANGE_LABEL, "range": r}
+        rng = total_range(df, calibrate(preds[m], m, "t1"), pool)
+    rng, widened = widen_to_include(rng, point)
+    return {"method": m, "label": RANGE_LABEL, "point": point, "range": rng, "widened": widened}
 
 
 # ------------------------------------------------------------------ extrapolation warning (section 7)

@@ -1,6 +1,6 @@
 {
-  "chosen": "B",
-  "reason": "near-best on both metrics (capture within 0.02, WAPE within 5% of best); simplest of ['B']",
+  "chosen": "A",
+  "reason": "near-best on both metrics (capture within 0.02, WAPE within 5% of best); simplest of ['A', 'B']",
   "beats_B1_outside_noise": true,
   "params": {
     "B": {
@@ -11,5 +11,7 @@
       "k": 10,
       "drought_weight": 1.0
     }
-  }
+  },
+  "chosen_before_calibration": "B",
+  "note": "pre-declared rule applied to pooled calibrated metrics; walk-forward part is in-sample for k, see validation_report.md section F"
 }
