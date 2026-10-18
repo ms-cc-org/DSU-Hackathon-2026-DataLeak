@@ -1,4 +1,4 @@
-"""Method and data notes: filters, missing values, definitions, coverage, validation, limits."""
+"""Evidence: method and data notes (filters, missing values, definitions, coverage, validation, limits), then credits."""
 
 from pathlib import Path
 
@@ -6,6 +6,8 @@ import pandas as pd
 import streamlit as st
 
 from src.data_loader import load_master
+from web.credits import renderCredits
+from web.ui import eyebrow
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -27,15 +29,18 @@ def coverageTable() -> pd.DataFrame:
     return table
 
 
-st.title("Method and data")
+eyebrow("EVIDENCE")
+st.title("How the numbers are made.")
+st.write("Filters, definitions, coverage, validation results and limits, then the credits. Every number in the app "
+         "comes from the supplied records or the documented prototype lookup.")
 
 st.subheader("The decision and the cutoff")
 st.write(
     "The budget officer decides on **August 15**. Anything used to estimate a season must be known "
-    "by that date: drought levels in the Scenarios engine come only from weekly Drought Monitor maps "
+    "by that date: drought levels in the Planner and the viewer's Scenario mode come only from weekly Drought Monitor maps "
     "dated from the crop's season start to August 15 (May 1 for corn and soybeans, June 1 for sorghum). "
     "Winter wheat is harvested before August 15, so its level covers its whole season (September to June). "
-    "The master table's season totals are used only to describe past years on the County risk page."
+    "The master table's season totals are used only to describe past years on the Explore 3D tab."
 )
 
 st.subheader("Filters and missing values")
@@ -100,8 +105,13 @@ st.markdown(
   fully, so drought losses there can look smaller for reasons the data cannot show.
 - Drought explains only part of yield loss: some large losses (for example Mahaska County corn in 2010)
   came in years without D2+ drought.
-- The scenario engine looks up similar past years. It is not a weather forecast, and its
-  "Predict" option is a model estimate from 2000-2025 history.
+- The scenario numbers come from a prototype lookup of similar past years (`web/scenario_lookup.py`), not a
+  validated model. It is not a weather forecast, and its "Predict" option is a model estimate from 2000-2025 history.
 - Data ends in 2025.
 """
 )
+
+st.divider()
+eyebrow("CREDITS")
+st.title("Sources, tools and AI use.")
+renderCredits()
