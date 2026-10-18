@@ -4,7 +4,7 @@
 
 ## Current team project: Drought Relief Allocation Planner
 
-A Streamlit app for an Iowa drought-relief budget officer deciding, on **August 15**, how to split a fixed relief fund across counties. It shows how often severe drought hits each county, how much corn yield it loses when it does, and what that costs (an estimated crop loss, not a program payout). The [project scope](docs/PROJECT_SCOPE.md) and [architecture overview](docs/ARCHITECTURE_OVERVIEW.md) record the plan and the folder layout.
+A Streamlit app for a state drought-relief budget officer deciding, on **August 15**, how to split a fixed relief fund across counties. It covers all four states in the dataset (California, Delaware, Iowa, Nebraska), all 253 counties in the boundary file and all four crops; Iowa corn is the default view. It shows how often severe drought hits each county, how much corn yield it loses when it does, and what that costs (an estimated crop loss, not a program payout). The [project scope](docs/PROJECT_SCOPE.md) and [architecture overview](docs/ARCHITECTURE_OVERVIEW.md) record the plan and the folder layout.
 
 ### Run it
 
@@ -23,8 +23,8 @@ The app opens at http://localhost:8501. No API keys and no network are needed at
 
 | Page | What it shows | Status |
 |---|---|---|
-| Overview | The user, the decision, how to use the site, a real yield chart | Done |
-| County risk (Mode 1) | Ranked county cards (exposure, vulnerability, expected loss), drought and cost charts by year, and a **Visualize** button that opens the 3D viewer: a county diorama with a 2000-2025 year slider, a soil cutaway, and an extruded Iowa state map | Done |
+| Overview | An animated banner (drawn in code), count-up dataset stats, an animated 2000-2025 drought map of all 253 counties, the user, the decision, how to use the site | Done |
+| County risk (Mode 1) | State and crop selectors, ranked county cards (exposure, vulnerability, expected loss), drought and cost charts by year, and a **Visualize** button that opens the 3D viewer: a county diorama with a 2000-2025 year slider, a soil cutaway, and an extruded map of all four states (253 counties) | Done |
 | Scenarios (Mode 2) | Expected loss for a county, crop, year up to 2030 and drought level | Lane 3 page; the 3D sandbox is ready in `web/render3d.py` |
 | Budget allocation | Fund split under a chosen rule and trigger | Lane 3 |
 | Method and data | Filters, missing values, definitions, coverage, backtest results, limits | Done; backtest results appear once saved |
@@ -32,19 +32,21 @@ The app opens at http://localhost:8501. No API keys and no network are needed at
 
 ### AI-use disclosure
 
-- **Claude Code (Anthropic)** helped write the 3D viewer (`web/assets/viewer/viewer.html`, `web/render3d.py`), the County risk, Overview, Method and data, and Credits pages, `web/ui.py`, and this README. How we verified it:
+- **Claude Code (Anthropic)** helped write the 3D viewer (`web/assets/viewer/viewer.html`, `web/render3d.py`), the County risk, Overview, Method and data, and Credits pages, the theme and animations (`web/ui.py`, `.streamlit/config.toml`), and this README. How we verified it:
   - We ran every page and checked numbers against the master table. For example, Mahaska County corn 2012 shows 133.0 bu/acre, 25.0% below trend, and a D3 drought level.
   - We confirmed that years with no reported yield show "No data", never zero.
-  - We checked that the viewer loads with no console errors and holds about 60 fps.
+  - We checked that the viewer loads with no console errors and holds 60 fps on an Apple M2 laptop, including the all-states map.
   - We ran a clean-clone test of the launch command.
 - **OpenAI Codex** helped organize the repository scaffold, page navigation, the Iowa corn history filter and the project documentation. It was verified by compiling the code and checking that the filter returned 2,574 Iowa corn rows across 99 counties (2,470 reported yields).
 - **Higgsfield** was planned for decorative media only, but **no media has been generated**: the account's free plan does not allow generation. The planned prompts are in [`web/assets/PROMPTS.md`](web/assets/PROMPTS.md). The app runs without these files.
+
+The Overview banner animation is drawn in code (CSS and SVG); it is decorative and labeled "Illustrative animation, not data".
 
 The team reviewed the AI-written code and can explain and change any part of it. Every number, chart and map in the app is computed from the supplied records.
 
 ### Credits for this project
 
-The data credits are in [Credits](#credits) below. We also use [three.js](https://threejs.org) r169 (MIT license, bundled), [Streamlit](https://streamlit.io), [pandas](https://pandas.pydata.org), [NumPy](https://numpy.org), [Plotly](https://plotly.com/python/) and [scikit-learn](https://scikit-learn.org). Crop prices are editable assumptions (corn $4.00/bu, soybeans $10.00/bu) until a cited source is added.
+The data credits are in [Credits](#credits) below. We also use [three.js](https://threejs.org) r169 (MIT license, bundled), [Streamlit](https://streamlit.io), [pandas](https://pandas.pydata.org), [NumPy](https://numpy.org), [Plotly](https://plotly.com/python/) and [scikit-learn](https://scikit-learn.org). Crop prices are editable assumptions (corn $4.00/bu, soybeans $10.00/bu, winter wheat $5.50/bu, sorghum $4.00/bu) until a cited source is added.
 
 ---
 
@@ -298,6 +300,7 @@ If you want a question to explore before choosing a user:
 
 ```
 app.py                          Streamlit page navigation — run with: python -m streamlit run app.py
+.streamlit/config.toml          dark theme that matches the 3D viewer
 LICENSE                         MIT license for the code and docs (data credits in README)
 requirements.txt                pinned dependencies (app, notebook, modelling)
 .env.example                    provider configuration template (no real keys)
@@ -309,7 +312,7 @@ web/
 │   ├── viewer/vendor/          three.js r169, bundled so the app works offline (MIT)
 │   ├── media/                  optional decorative media (none yet)
 │   └── PROMPTS.md              prompts and status for generated media
-├── ui.py                       shared labels, styling, price input, assets with fallback
+├── ui.py                       shared labels, theme motion, animated banner and stats, assets with fallback
 └── render3d.py                 county records for the viewer and the County risk page; embeds the viewer
 
 data/

@@ -6,7 +6,6 @@ import pandas as pd
 import streamlit as st
 
 from src.data_loader import load_master
-from web.ui import applyStyle
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -16,34 +15,35 @@ COVERAGE_FILE = REPO_ROOT / "docs" / "coverage.csv"
 
 @st.cache_data(show_spinner=False)
 def coverageTable() -> pd.DataFrame:
-    """Counties with a reported yield, by crop and year (Iowa). Uses docs/coverage.csv if Lane 1 saved one."""
+    """Counties with a reported yield, by state, crop and year. Uses docs/coverage.csv if Lane 1 saved one."""
     if COVERAGE_FILE.exists():
         return pd.read_csv(COVERAGE_FILE)
     master = load_master()
-    iowa = master[(master["state_alpha"] == "IA") & master["crop"].isin(["CORN", "SOYBEANS"])]
-    reported = iowa[iowa["yield_status"] == "reported"]
-    table = pd.crosstab(reported["crop"], reported["year"])
+    reported = master[master["yield_status"] == "reported"]
+    table = pd.crosstab([reported["state_alpha"], reported["crop"]], reported["year"])
     keep = [y for y in table.columns if y % 5 == 0 or y == 2025]
-    table = table[keep].reset_index().rename(columns={"crop": "Crop (Iowa)"})
+    table = table[keep].reset_index().rename(columns={"state_alpha": "State", "crop": "Crop"})
     table.columns = [str(c) for c in table.columns]  # years as text headers
     return table
 
 
-applyStyle()
 st.title("Method and data")
 
 st.subheader("The decision and the cutoff")
 st.write(
     "The budget officer decides on **August 15**. Anything used to estimate a season must be known "
     "by that date: drought levels in the Scenarios engine come only from weekly Drought Monitor maps "
-    "dated May 1 to August 15. The master table's season totals (weather and drought through the end "
-    "of September) are used only to describe past years on the County risk page."
+    "dated from the crop's season start to August 15 (May 1 for corn and soybeans, June 1 for sorghum). "
+    "Winter wheat is harvested before August 15, so its level covers its whole season (September to June). "
+    "The master table's season totals are used only to describe past years on the County risk page."
 )
 
 st.subheader("Filters and missing values")
 st.markdown(
     """
-- **Geography and crops:** Iowa counties; corn (County risk) and corn or soybeans (Scenarios).
+- **Geography and crops:** all four states in the dataset (California, Delaware, Iowa, Nebraska) and all four
+  crops (corn, soybeans, winter wheat, sorghum). Iowa corn is the default view because it has the best coverage
+  and Iowa is rainfed. 23 counties in the boundary file have no records and show as "No data".
 - **County codes:** FIPS is kept as 5-character text, so codes never lose a leading zero.
 - **Yields:** only rows with `yield_status == "reported"` count. A missing yield is never filled with
   zero: it shows as "No data" (a gap in charts, bare grey soil in the 3D scene).
@@ -72,7 +72,8 @@ st.markdown(
 st.subheader("Coverage: counties with a reported yield")
 try:
     st.dataframe(coverageTable(), hide_index=True, width="stretch")
-    st.caption("Reported yields thin out in recent years (for example 2025), so recent results rest on fewer counties.")
+    st.caption("Reported yields thin out in recent years (for example 2025) and are sparse for California, Delaware, "
+               "sorghum and wheat outside Nebraska, so results there rest on few counties.")
 except Exception as error:
     st.warning(f"Coverage could not be computed: {error}")
 
@@ -95,7 +96,8 @@ st.subheader("Limits")
 st.markdown(
     """
 - County averages only: nothing at field level. The 3D scene is illustrative, not a map of fields.
-- Irrigation is not in the master table; Iowa is mostly rainfed, which is why Iowa was chosen.
+- Irrigation is not in the master table. Iowa is rainfed; Nebraska is about half irrigated and California almost
+  fully, so drought losses there can look smaller for reasons the data cannot show.
 - Drought explains only part of yield loss: some large losses (for example Mahaska County corn in 2010)
   came in years without D2+ drought.
 - The scenario engine looks up similar past years. It is not a weather forecast, and its

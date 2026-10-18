@@ -2,10 +2,9 @@
 
 import streamlit as st
 
-from web.ui import applyStyle, assetPath
+from web.ui import assetPath
 
 
-applyStyle()
 st.title("Credits")
 
 st.subheader("Data sources")
@@ -21,8 +20,8 @@ All data is public federal data, supplied in the starter repository.
 - **Soil:** Soil Survey Staff, Natural Resources Conservation Service, United States Department of
   Agriculture. Soil Survey Geographic (SSURGO) Database, via Soil Data Access.
 - **County boundaries:** U.S. Census Bureau county boundaries, from the plotly/datasets county GeoJSON.
-- **Crop prices:** the app uses an editable assumed price (corn \\$4.00/bu, soybeans \\$10.00/bu) until a
-  cited price source is added.
+- **Crop prices:** the app uses editable assumed prices (corn \\$4.00/bu, soybeans \\$10.00/bu, winter wheat
+  \\$5.50/bu, sorghum \\$4.00/bu) until a cited price source is added.
 """
 )
 
@@ -36,7 +35,8 @@ st.markdown(
 """
 )
 
-st.subheader("Generated media")
+st.subheader("Animation and media")
+st.write("The Overview banner animation is drawn in code (CSS and SVG). It is decorative and never data.")
 if assetPath("intro_loop.mp4") or assetPath("hero_field.jpg"):
     st.write(
         "The intro animation and header images were generated with Higgsfield. They are decorative "

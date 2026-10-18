@@ -6,6 +6,8 @@ Run from the repository root:
 
 import streamlit as st
 
+from web.ui import applyStyle
+
 
 st.set_page_config(
     page_title="Drought Relief Allocation Planner",
@@ -24,7 +26,8 @@ currentPage = st.navigation(
     ]
 )
 
+applyStyle()  # shared theme motion for every page (style only; takes no space)
 st.sidebar.caption(
-    "Iowa · August 15 decision · Dollar values are an estimated crop loss, not program payout."
+    "California · Delaware · Iowa · Nebraska · August 15 decision. Dollar values are an estimated crop loss, not program payout."
 )
 currentPage.run()

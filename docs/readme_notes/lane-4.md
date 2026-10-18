@@ -2,14 +2,22 @@
 
 Branch: `lane-4-app`. Files owned: `app.py`, `web/render3d.py`, `web/ui.py`, `web/pages/1_overview.py`,
 `2_county_risk.py`, `5_method_and_data.py`, `6_credits.py`, `web/assets/`, `README.md`, `requirements.txt`,
-`.env.example`, `.gitignore`.
+`.env.example`, `.gitignore`, `.streamlit/config.toml` (theme).
 
 ## What is built
+
+- **Scope:** all four states (California, Delaware, Iowa, Nebraska), all 253 counties in the boundary file (23 have no
+  records and show as "No data"), and all four crops. Iowa corn is the default.
+- **Look and motion:**
+  - A dark theme that matches the viewer (`.streamlit/config.toml`).
+  - Shared motion injected once from `app.py`: fade-up entrances, card hover lift, a title shine and a soft glow on primary buttons. All of it is switched off for visitors who ask their system to reduce motion.
+  - Overview: an animated banner drawn in CSS and SVG (inside its own frame, because `st.html` strips SVG), count-up stats, and an animated drought map of all four states with a state switch.
 
 - **3D viewer** (`web/assets/viewer/viewer.html`, embedded by `web/render3d.py`):
   - **Layout:** the canvas on the left and a side panel on the right. The panel can be hidden, and stacks below the canvas on phones.
   - **Camera views:** three named views (State, Aerial, Soil Cutaway) with eased 1.2 s flights. Keys 1-3 select them, and space plays or pauses the years.
-  - **Scene:** a procedural county diorama, plus an extruded Iowa state map in Mode 1.
+  - **Scene:** a procedural county diorama, plus an extruded map of all four states in Mode 1. The map shows all states or one, and heights are scaled to the counties shown.
+  - **Crops:** a crop selector in both modes. Mode 2 lists only the crops a county reports.
   - **Offline:** three.js r169 is bundled and inlined, so the viewer needs no network.
 - **County risk page:**
   - Counties ranked by expected annual loss, never by average `yield_anomaly_pct`.
@@ -25,7 +33,7 @@ Branch: `lane-4-app`. Files owned: `app.py`, `web/render3d.py`, `web/ui.py`, `we
 - FIPS stays text.
 - One helper per language converts the shifted drought scale: `web/ui.py: droughtLabel()` in Python and `levelName()` in the viewer.
 - Mode 1 uses the master's full-season drought fields only to describe past years.
-- Mode 2 drought levels are the peak level from May 1 to Aug 15, taken from weekly maps dated on or before Aug 15 (`loadAsOfSeverity`).
+- Mode 2 drought levels are the peak level from the crop's season start to Aug 15, taken only from weekly maps inside that window (`loadSeasonPeak`). Corn and soybeans start May 1 and sorghum June 1. Winter wheat is harvested before Aug 15, so it uses its whole Sep-Jun season, and its 2000 season is empty because the Drought Monitor archive starts in Jan 2000.
 - Loss is yield below each county's linear trend fitted on 2000-2025. That is hindsight, and it is labeled so.
 
 ## Handoffs

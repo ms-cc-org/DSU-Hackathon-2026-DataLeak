@@ -7,11 +7,12 @@
 <!--
   Drought Relief Planner - 3D viewer.
 
-  Filled in by web/render3d.py, which replaces two placeholders (the IMPORT_MAP and DATA_JSON
-  tokens below, each written with two underscores on both sides):
+  Filled in by web/render3d.py, which replaces three placeholders (the IMPORT_MAP, DATA_JSON and
+  SETTINGS_JSON tokens below, each written with two underscores on both sides):
     the import map  three.js r169 is inlined from web/assets/viewer/vendor/ so the viewer
                     works without a network
-    the data        the county records and settings (see web/render3d.py for the shape)
+    the data        county records for all four states (see web/render3d.py for the shape)
+    the settings    mode, starting county, year, crop and prices
 
   Every shape and texture is generated in code: there are no model or image files.
 
@@ -162,6 +163,7 @@
 </div>
 
 <script id="data" type="application/json">__DATA_JSON__</script>
+<script id="settings" type="application/json">__SETTINGS_JSON__</script>
 
 <script>
   // Plain (non-module) fallback: if the 3D module has not started after 15 s, say so.
@@ -186,8 +188,8 @@ window.__viewerStarted = true;
 // 1. Data and helpers
 // ===========================================================================
 
-const DATA = JSON.parse(document.getElementById('data').textContent);
 const $ = (id) => document.getElementById(id);
+const DATA = Object.assign(JSON.parse($('data').textContent), JSON.parse($('settings').textContent));
 
 // The master's max_drought_severity is shifted by one: 0 = none, 1 = D0, ..., 5 = D4.
 // levelName() is the one place that turns that number into a label.
@@ -199,6 +201,11 @@ const levelName = (sev) => (sev == null ? 'No data' : LEVEL_NAMES[sev]);
 const levelText = (sev) => (sev == null ? 'No data' : `${LEVEL_NAMES[sev]} (${LEVEL_WORDS[sev]})`);
 
 const byFips = new Map(DATA.counties.map((c) => [c.fips, c]));
+const cropName = (crop) => DATA.cropNames[crop] ?? crop;
+const stateName = (code) => DATA.states[code] ?? code;
+const STATE_CODES = Object.keys(DATA.states);
+// Start on the requested county, or the first county with records if it is unknown.
+if (!byFips.get(DATA.focusFips)?.inMaster) DATA.focusFips = DATA.counties.find((c) => c.inMaster).fips;
 const FIRST = DATA.firstYear, LAST = DATA.lastYear, LAST_PROJECTED = DATA.lastProjectedYear;
 const yearIndex = (year) => year - FIRST;
 
@@ -477,7 +484,7 @@ async function createWorld(progress) {
       transparent: true, opacity: 0.85 }));
   water.position.set(tubeX, -TUBE_H, tubeZ);
   const waterLabel = makeLabel('Soil water storage', 6);
-  waterLabel.position.set(tubeX - 3.2, 1.0, tubeZ + 0.2);
+  waterLabel.position.set(tubeX - 5, 1.0, tubeZ + 0.2);
   scene.add(glass, water, waterLabel);
 
   // --- crop rows (instanced) ---------------------------------------------------
@@ -656,28 +663,35 @@ async function createWorld(progress) {
 function createStateMap() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#1a2029');
-  scene.fog = new THREE.Fog('#1a2029', 120, 260);
   scene.add(new THREE.HemisphereLight('#dfe8f2', '#3a3a3a', 1.3));
   const sun = new THREE.DirectionalLight('#fff4e2', 2.2);
-  sun.position.set(-30, 60, 40);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -50, right: 50, top: 40, bottom: -40, near: 1, far: 200 });
+  sun.position.set(-40, 90, 60);
   scene.add(sun);
 
-  // Simple projection: longitude scaled by cos(latitude), fit to about 70 units wide.
+  // One projection for all four states (longitude scaled by cos(latitude)), about 150 units wide,
+  // so the states keep their real positions relative to each other.
   const all = DATA.counties.flatMap((c) => c.rings.flat());
   const lons = all.map((p) => p[0]), lats = all.map((p) => p[1]);
   const lon0 = (Math.min(...lons) + Math.max(...lons)) / 2, lat0 = (Math.min(...lats) + Math.max(...lats)) / 2;
   const kx = Math.cos(lat0 * Math.PI / 180);
-  const scale = 70 / ((Math.max(...lons) - Math.min(...lons)) * kx);
+  const scale = 150 / ((Math.max(...lons) - Math.min(...lons)) * kx);
   const project = ([lon, lat]) => [(lon - lon0) * kx * scale, (lat - lat0) * scale];
-  const size = { width: (Math.max(...lons) - Math.min(...lons)) * kx * scale, depth: (Math.max(...lats) - Math.min(...lats)) * scale };
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: '#232a34', roughness: 1 }));
+  // Bounding box (in scene units) of each state and of everything, for camera framing.
+  const boxes = { ALL: new THREE.Box2() };
+  for (const c of DATA.counties) {
+    boxes[c.state] ??= new THREE.Box2();
+    for (const ring of c.rings) for (const p of ring) {
+      const [x, y] = project(p);
+      const v = new THREE.Vector2(x, -y);   // scene x and z (north is -z)
+      boxes[c.state].expandByPoint(v);
+      boxes.ALL.expandByPoint(v);
+    }
+  }
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 400), new THREE.MeshStandardMaterial({ color: '#232a34', roughness: 1 }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.02;
-  ground.receiveShadow = true;
   scene.add(ground);
 
   const meshes = [];
@@ -687,9 +701,8 @@ function createStateMap() {
     const geo = new THREE.ExtrudeGeometry(shapes, { depth: 1, bevelEnabled: false });
     geo.rotateX(-Math.PI / 2); // extrusion now points up (+y), north is -z
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: NO_DATA_COLOR, roughness: 0.7 }));
-    mesh.castShadow = mesh.receiveShadow = true;
-    mesh.scale.y = 0.06;
-    mesh.userData = { fips: c.fips, targetH: 0.06, targetColor: new THREE.Color(NO_DATA_COLOR) };
+    mesh.scale.y = 0.04;
+    mesh.userData = { fips: c.fips, targetH: 0.04, targetColor: new THREE.Color(NO_DATA_COLOR) };
     mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30),
       new THREE.LineBasicMaterial({ color: '#10151b', transparent: true, opacity: 0.55 })));
     scene.add(mesh);
@@ -700,25 +713,28 @@ function createStateMap() {
   }
 
   // A floating pin over the county shown in the diorama.
-  const pin = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.6, 16),
+  const pin = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.4, 16),
     new THREE.MeshStandardMaterial({ color: '#f0b429', emissive: '#f0b429', emissiveIntensity: 0.5 }));
   pin.rotation.x = Math.PI;
   scene.add(pin);
 
   let values = new Map();
-  // Height = estimated dollar loss for the selected year; color = that year's drought level.
-  function setYear(year, price) {
+  // Height = estimated dollar loss for the selected year and crop, scaled to the counties in scope;
+  // color = that year's max drought level for the crop's season. Grey and flat = no data.
+  function setYear(year, crop, price, scope) {
     const i = yearIndex(year);
     values = new Map(DATA.counties.map((c) => {
       if (!c.inMaster) return [c.fips, { dollars: null, sev: null, missing: true }];
-      const Y = c.crops.CORN;
+      const Y = c.crops[crop];
+      if (!Y) return [c.fips, { dollars: null, sev: null, noCrop: true }];
       const dollars = Y.lossBu[i] == null || Y.acres[i] == null ? null : Y.lossBu[i] * Y.acres[i] * price;
-      return [c.fips, { dollars, sev: c.sev[i] }];
+      return [c.fips, { dollars, sev: Y.sev[i] }];
     }));
-    const max = Math.max(1, ...[...values.values()].map((v) => v.dollars ?? 0));
+    const inScope = DATA.counties.filter((c) => scope === 'ALL' || c.state === scope);
+    const max = Math.max(1, ...inScope.map((c) => values.get(c.fips).dollars ?? 0));
     for (const mesh of meshes) {
       const v = values.get(mesh.userData.fips);
-      mesh.userData.targetH = v.dollars == null ? 0.06 : 0.25 + 9 * v.dollars / max;
+      mesh.userData.targetH = v.dollars == null ? 0.04 : 0.2 + 6 * Math.min(1, v.dollars / max);
       mesh.userData.targetColor.set(v.dollars == null ? NO_DATA_COLOR : LEVEL_COLORS[v.sev ?? 0]);
     }
   }
@@ -731,10 +747,10 @@ function createStateMap() {
     }
     const c = centers.get(focusFips);
     const focusMesh = meshes.find((m) => m.userData.fips === focusFips);
-    if (c && focusMesh) pin.position.set(c.x, focusMesh.scale.y + 2 + Math.sin(time * 2) * 0.3, c.z);
+    if (c && focusMesh) pin.position.set(c.x, focusMesh.scale.y + 1.6 + Math.sin(time * 2) * 0.25, c.z);
   }
 
-  return { scene, meshes, centers, size, setYear, update, value: (fips) => values.get(fips) };
+  return { scene, meshes, centers, boxes, setYear, update, value: (fips) => values.get(fips) };
 }
 
 // ===========================================================================
@@ -746,14 +762,15 @@ const VIEWS = {
   soil:   { pos: [3.5, 0.2, 24], target: [4.5, -1.2, 0] },
 };
 
-// State overview: back the camera off until the whole state fits the canvas shape.
-function stateOverview() {
-  const { width, depth } = stateMap.size;
+// State view framing: back the camera off until the chosen state (or all four) fits the canvas.
+function stateOverview(scope = app.mapScope) {
+  const box = stateMap.boxes[scope] ?? stateMap.boxes.ALL;
+  const size = box.getSize(new THREE.Vector2()), center = box.getCenter(new THREE.Vector2());
   const vHalf = THREE.MathUtils.degToRad(camera.fov / 2);
   const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
-  const dist = 1.12 * Math.max((width / 2 + 3) / Math.tan(hHalf), (depth / 2 + 3) / Math.tan(vHalf));
-  const tilt = THREE.MathUtils.degToRad(52);
-  return { pos: [0, dist * Math.sin(tilt), 3 + dist * Math.cos(tilt)], target: [0, 0, 3] };
+  const dist = 1.12 * Math.max((size.x / 2 + 2) / Math.tan(hHalf), (size.y / 2 + 2) / Math.tan(vHalf), 12);
+  const tilt = THREE.MathUtils.degToRad(55);
+  return { pos: [center.x, dist * Math.sin(tilt), center.y + dist * Math.cos(tilt)], target: [center.x, 0, center.y] };
 }
 
 let flight = null;
@@ -789,7 +806,9 @@ const app = {
   view: 'diorama',            // 'diorama' or 'state'
   fips: DATA.focusFips,
   year: DATA.startYear,
-  price: DATA.defaultPrice.CORN,
+  crop: DATA.startCrop,
+  prices: { ...DATA.defaultPrice },      // assumed $/bushel per crop, editable in the panel
+  mapScope: byFips.get(DATA.focusFips).state,  // 'ALL' or a state code
   playing: false,
   hoverFips: null,
 };
@@ -807,8 +826,13 @@ function waterText(aws) {
 
 function historyTarget(c, year) {
   const i = yearIndex(year);
-  const Y = c.crops.CORN;
-  const sev = c.sev[i];
+  const Y = c.crops[app.crop];
+  if (!Y) {
+    return { values: { present: 0, noData: 1, health: 1, bonus: 0, severity: 0, gauge: 0, aws: c.aws ?? 0 },
+      gaugeText: 'Max drought: No data', waterText: waterText(c.aws),
+      statusText: `No ${cropName(app.crop).toLowerCase()} records for ${c.name}` };
+  }
+  const sev = Y.sev[i];
   const look = healthFromAnomaly(Y.anomaly[i]);
   let statusText = null;
   if (Y.yield[i] == null) statusText = `No data: no reported yield in ${year}`;
@@ -825,54 +849,71 @@ function historyTarget(c, year) {
 function renderHistory() {
   const c = byFips.get(app.fips);
   const i = yearIndex(app.year);
-  const Y = c.crops.CORN;
+  const Y = c.crops[app.crop];
+  const price = app.prices[app.crop];
+  const crop = cropName(app.crop).toLowerCase();
   worldA.setTarget(historyTarget(c, app.year));
-  stateMap.setYear(app.year, app.price);
+  stateMap.setYear(app.year, app.crop, price, app.mapScope);
   $('yearSlider').value = app.year;
   $('yearLabel').textContent = app.year;
   $('title').textContent = app.view === 'state'
-    ? `${DATA.stateName} - corn - ${app.year}` : `${c.name}, ${DATA.stateName} - corn - ${app.year}`;
+    ? `${app.mapScope === 'ALL' ? 'All four states' : stateName(app.mapScope)} - ${crop} - ${app.year}`
+    : `${c.name}, ${stateName(c.state)} - ${crop} - ${app.year}`;
 
-  const dollars = Y.lossBu[i] == null || Y.acres[i] == null ? null : Y.lossBu[i] * Y.acres[i] * app.price;
+  const dollars = !Y || Y.lossBu[i] == null || Y.acres[i] == null ? null : Y.lossBu[i] * Y.acres[i] * price;
   const missing = DATA.counties.filter((k) => !k.inMaster).length;
+  const cropOptions = Object.keys(DATA.cropNames).map((k) =>
+    `<option value="${k}" ${k === app.crop ? 'selected' : ''}>${cropName(k)}${c.crops[k] ? '' : ' (no records here)'}</option>`).join('');
+  const scopeButtons = ['ALL', ...STATE_CODES].map((code) =>
+    `<button data-scope="${code}" class="${code === app.mapScope ? 'on' : ''}">${code === 'ALL' ? 'All' : stateName(code)}</button>`).join(' ');
   const legend = app.view !== 'state' ? '' : `
     <h3>State view - ${app.year}</h3>
-    <div class="small">Height: estimated crop loss in dollars for ${app.year} (not program payout).
-      Color: that year's max drought level. Hover a county for its numbers; click to open its diorama.</div>
+    <div class="small" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${scopeButtons}</div>
+    <div class="small">Height: estimated ${crop} loss in dollars for ${app.year} (not program payout), scaled to the
+      counties shown. Color: that year's max drought level. Hover a county for its numbers; click to open its diorama.</div>
     <div class="small" style="margin-top:6px">${LEVEL_NAMES.map((n, k) =>
       `<span style="white-space:nowrap;margin-right:6px"><span class="sw" style="background:${LEVEL_COLORS[k]}"></span>${n}</span>`).join('')}</div>
     <div class="small" style="margin-top:4px"><span class="sw" style="background:${NO_DATA_COLOR}"></span>Flat grey: no data
-      (no reported yield that year${missing ? `, or one of the ${missing} counties not in the master dataset` : ''}).</div>`;
+      (no reported ${crop} yield that year, or one of the ${missing} counties not in the master dataset).</div>`;
 
   $('panel').innerHTML = `
     ${legend}
-    <h3>Details - ${c.name}, ${app.year}</h3>
+    <div class="field"><label for="cropSelect">Crop</label><select id="cropSelect">${cropOptions}</select></div>
+    <h3>Details - ${c.name}, ${stateName(c.state)}, ${app.year}</h3>
+    ${!Y ? `<div class="warn small">No ${crop} records for this county. Pick another crop or county.</div>` : `
     <table class="kv">
       <tr><td>Yield (bu/acre)</td><td>${fmt(Y.yield[i])}</td></tr>
       <tr><td>County trend (bu/acre)</td><td>${fmt(Y.trend[i])}</td></tr>
       <tr><td>yield_anomaly_pct</td><td>${pct(Y.anomaly[i])}</td></tr>
-      <tr><td>Max drought level</td><td>${levelText(c.sev[i])}</td></tr>
-      <tr><td>Weeks in D2+</td><td>${c.weeks[i] == null ? 'No data' : c.weeks[i]}</td></tr>
+      <tr><td>Max drought level</td><td>${levelText(Y.sev[i])}</td></tr>
+      <tr><td>Weeks in D2+</td><td>${Y.weeks[i] == null ? 'No data' : Y.weeks[i]}</td></tr>
       <tr><td>Soil water storage</td><td>${c.aws == null ? 'No data' : c.aws + ' mm'}</td></tr>
-      <tr><td>nccpi_crop (soil quality)</td><td>${c.nccpi == null ? 'No data' : c.nccpi.toFixed(2)}</td></tr>
+      <tr><td>nccpi_crop (soil quality)</td><td>${Y.nccpi == null ? 'No data' : Y.nccpi.toFixed(2)}</td></tr>
       <tr><td>Est. crop loss</td><td>${money(dollars)}</td></tr>
     </table>
     <canvas id="chart"></canvas>
     <div class="small muted">Solid: reported yield. Dashed: county linear trend. Gaps: no reported yield.
-      Marker: ${app.year}.</div>
-    <div class="field" style="margin-top:10px"><label for="priceInput">Corn price ($/bushel) - assumed price, replace with a cited source</label>
-      <input type="number" id="priceInput" min="0" step="0.25" value="${app.price.toFixed(2)}"></div>
+      Marker: ${app.year}.</div>`}
+    <div class="field" style="margin-top:10px"><label for="priceInput">${cropName(app.crop)} price ($/bushel) - assumed price, replace with a cited source</label>
+      <input type="number" id="priceInput" min="0" step="0.25" value="${price.toFixed(2)}"></div>
     <div class="small muted">Est. crop loss = max(0, trend - yield) x planted acres x price: an estimated crop loss,
       not program payout. The trend and yield_anomaly_pct use all 2000-2025 years (hindsight).
-      Max drought level and weeks in D2+ cover the full corn season (May-Sep). Soil values are static per county.</div>
+      Max drought level and weeks in D2+ cover the crop's full season. Soil values are static per county.</div>
     <h3>What the scene shows</h3>
     <div class="small muted">Plant height, color and lean: yield_anomaly_pct. Sky, haze, clouds, dust, soil cracks and gauge:
-      max drought level. Blue fill: soil water storage as a share of the top 100 cm of soil. Hills, rows and layers are decoration.</div>`;
+      max drought level. Blue fill: soil water storage as a share of the top 100 cm of soil. Plants are drawn as corn
+      for every crop; hills, rows and layers are decoration.</div>`;
   $('priceInput').addEventListener('change', (e) => {
     const v = Number(e.target.value);
-    if (v >= 0) { app.price = v; renderHistory(); }
+    if (v >= 0) { app.prices[app.crop] = v; renderHistory(); }
   });
-  drawChart(c, i);
+  $('cropSelect').addEventListener('change', (e) => { app.crop = e.target.value; renderHistory(); });
+  document.querySelectorAll('[data-scope]').forEach((b) => b.addEventListener('click', () => {
+    app.mapScope = b.dataset.scope;
+    renderHistory();
+    flyTo(stateOverview(app.mapScope));
+  }));
+  if (Y) drawChart(c, i);
 }
 
 function drawChart(c, sel) {
@@ -882,7 +923,9 @@ function drawChart(c, sel) {
   cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext('2d');
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const ys = c.crops.CORN.yield, tr = c.crops.CORN.trend;
+  const Y = c.crops[app.crop];
+  if (!Y) return;
+  const ys = Y.yield, tr = Y.trend;
   const vals = [...ys, ...tr].filter((v) => v != null);
   g.font = '10px system-ui, sans-serif';
   if (!vals.length) { g.fillStyle = '#a3adb8'; g.fillText('No reported yields', 8, 20); return; }
@@ -916,9 +959,10 @@ function enterState() {
   if (app.mode !== 'history') return;
   if (app.view === 'state') { flyTo(stateOverview()); return; }
   const c = stateMap.centers.get(app.fips);
+  if (app.mapScope !== 'ALL') app.mapScope = byFips.get(app.fips).state;
   fade(() => {
     app.view = 'state';
-    placeCamera({ pos: [c.x, 9, c.z + 7], target: [c.x, 0, c.z] });
+    placeCamera({ pos: [c.x, 6, c.z + 4.5], target: [c.x, 0, c.z] });
     updateViewUI();
   }, () => flyTo(stateOverview(), 1.4));
 }
@@ -927,7 +971,7 @@ function enterCounty(fips, view = 'aerial') {
   const c = stateMap.centers.get(fips);
   app.fips = fips;
   renderHistory();
-  flyTo({ pos: [c.x, 7, c.z + 5], target: [c.x, 0, c.z] }, 1.0, () => fade(() => {
+  flyTo({ pos: [c.x, 5, c.z + 3.5], target: [c.x, 0, c.z] }, 1.0, () => fade(() => {
     app.view = 'diorama';
     worldA.setTarget(historyTarget(byFips.get(fips), app.year));
     placeCamera({ pos: [0, 45, 34], target: [0, 0, 0] });
@@ -939,6 +983,11 @@ function enterCounty(fips, view = 'aerial') {
 // 8. Mode 2: scenario sandbox
 // ===========================================================================
 
+// Drought window behind each crop's level (matches AS_OF_WINDOWS in web/render3d.py).
+const SEASON_TEXT = {
+  CORN: 'from May 1 to Aug 15', SOYBEANS: 'from May 1 to Aug 15', SORGHUM: 'from Jun 1 to Aug 15',
+  WHEAT: 'over its whole season (Sep 1 to Jun 30; winter wheat is harvested before Aug 15)',
+};
 // Drought level buckets used by the sandbox: D0..D4 (a year with no drought counts as D0).
 const SB_LEVELS = ['D0', 'D1', 'D2', 'D3', 'D4'];
 const bucketOf = (sev) => Math.max(1, sev) - 1;       // master scale 0..5 -> bucket 0..4 (D0..D4)
@@ -948,9 +997,10 @@ const sevOfBucket = (b) => b + 1;                       // bucket -> master scal
 function sandboxHistory(c, crop) {
   const Y = c.crops[crop];
   const out = [];
+  if (!Y) return out;
   for (let i = 0; i <= LAST - FIRST; i++) {
-    if (Y.lossPct[i] == null || c.asofSev[i] == null) continue;
-    out.push({ year: FIRST + i, bucket: bucketOf(c.asofSev[i]), loss: Y.lossPct[i] });
+    if (Y.lossBu[i] == null || Y.trend[i] == null || Y.asof[i] == null) continue;
+    out.push({ year: FIRST + i, bucket: bucketOf(Y.asof[i]), loss: 100 * Y.lossBu[i] / Y.trend[i] });
   }
   return out;
 }
@@ -984,7 +1034,9 @@ function runEngine() {
   const c = byFips.get(sb.fips);
   const Y = c.crops[sb.crop];
   const hist = sandboxHistory(c, sb.crop);
-  if (hist.length < 5 || !Y.trendCoef) return { error: `Too few reported ${sb.crop.toLowerCase()} yields in ${c.name} for a scenario.` };
+  if (!Y || hist.length < 5 || !Y.trendCoef) {
+    return { error: `Too few reported ${cropName(sb.crop).toLowerCase()} yields in ${c.name} for a scenario. Pick another crop or county.` };
+  }
 
   // Trend yield and planted acres for the selected year (2026-2030: linear trend extension, latest acres).
   const projected = sb.year > LAST;
@@ -1017,7 +1069,7 @@ function renderSandbox() {
   const c = byFips.get(sb.fips);
   const r = runEngine();
   const projected = sb.year > LAST;
-  $('title').textContent = `${c.name}, ${DATA.stateName} - ${sb.crop === 'CORN' ? 'corn' : 'soybeans'} - ${sb.year}${projected ? ' (projected)' : ''}`;
+  $('title').textContent = `${c.name}, ${stateName(c.state)} - ${cropName(sb.crop).toLowerCase()} - ${sb.year}${projected ? ' (projected)' : ''}`;
 
   if (r.error) {
     worldA.setTarget({ values: { present: 0, noData: 1, health: 1, bonus: 0, severity: 0, gauge: 0, aws: c.aws ?? 0 },
@@ -1065,33 +1117,48 @@ function renderSandbox() {
     ${predictBlock}
     <h3>Closest 3 historical years</h3>
     <table class="kv small">
-      <tr class="muted"><td>Year</td><td>Level by Aug 15</td><td style="text-align:right">Actual loss</td></tr>
+      <tr class="muted"><td>Year</td><td>Drought level</td><td style="text-align:right">Actual loss</td></tr>
       ${r.nearest.map((h) => `<tr><td>${h.year}</td><td>${SB_LEVELS[h.bucket]}</td><td>${h.loss.toFixed(1)}%</td></tr>`).join('')}
     </table>
-    <div class="small muted" style="margin-top:8px">Engine: past ${sb.crop === 'CORN' ? 'corn' : 'soybean'} years in this county
-      whose peak drought level from May 1 to Aug 15 matches the selected level; median loss, range = min to max.
+    <div class="small muted" style="margin-top:8px">Engine: past ${cropName(sb.crop).toLowerCase()} years in this county
+      whose peak drought level ${SEASON_TEXT[sb.crop]} matches the selected level; median loss, range = min to max.
       Loss = yield below the county's 2000-2025 linear trend. No machine learning.</div>`;
 }
 
 function buildSandboxPanel() {
-  const counties = DATA.counties.filter((c) => c.inMaster).sort((a, b) => a.name.localeCompare(b.name));
   const years = [];
   for (let y = FIRST; y <= LAST_PROJECTED; y++) years.push(y);
+  const countyOptions = STATE_CODES.map((code) => {
+    const list = DATA.counties.filter((c) => c.inMaster && c.state === code).sort((a, b) => a.name.localeCompare(b.name));
+    return `<optgroup label="${stateName(code)}">${list.map((c) => `<option value="${c.fips}">${c.name}</option>`).join('')}</optgroup>`;
+  }).join('');
   $('panel').innerHTML = `
     <h3>Scenario inputs</h3>
-    <div class="field"><label for="sbCounty">County</label><select id="sbCounty">
-      ${counties.map((c) => `<option value="${c.fips}">${c.name}</option>`).join('')}</select></div>
-    <div class="field"><label for="sbCrop">Crop</label><select id="sbCrop">
-      <option value="CORN">Corn</option><option value="SOYBEANS">Soybeans</option></select></div>
+    <div class="field"><label for="sbCounty">County</label><select id="sbCounty">${countyOptions}</select></div>
+    <div class="field"><label for="sbCrop">Crop</label><select id="sbCrop"></select></div>
     <div class="field"><label for="sbYear">Year</label><select id="sbYear">
       ${years.map((y) => `<option value="${y}">${y}${y > LAST ? ' (projected)' : ''}</option>`).join('')}</select>
       <div class="small muted" style="margin-top:3px">2026-2030 trend yield is a linear extension of the county's 2000-2025 trend.</div></div>
     <div class="field"><label for="sbLevel">Drought level</label><select id="sbLevel"></select></div>
-    <div class="field"><label for="sbPrice">Price ($/bushel) - assumed price, replace with a cited source</label>
-      <input type="number" id="sbPrice" min="0" step="0.25"></div>
+    <div class="field"><label for="sbPrice" id="sbPriceLabel"></label><input type="number" id="sbPrice" min="0" step="0.25"></div>
     <h3>Output</h3>
     <div id="sbOutput"></div>`;
 
+  // Only crops this county reports appear; switch to a usable crop when the county changes.
+  const fillCrops = () => {
+    const c = byFips.get(sb.fips);
+    const usable = Object.keys(DATA.cropNames).filter((k) => c.crops[k]?.trendCoef);
+    if (!c.crops[sb.crop]?.trendCoef && usable.length) setCrop(usable[0]);
+    $('sbCrop').innerHTML = Object.keys(DATA.cropNames).filter((k) => c.crops[k])
+      .map((k) => `<option value="${k}">${cropName(k)}${c.crops[k].trendCoef ? '' : ' (too few years)'}</option>`).join('');
+    $('sbCrop').value = sb.crop;
+  };
+  const setCrop = (crop) => {
+    sb.crop = crop;
+    sb.price = DATA.defaultPrice[crop];
+    $('sbPrice').value = sb.price.toFixed(2);
+    $('sbPriceLabel').textContent = `${cropName(crop)} price ($/bushel) - assumed price, replace with a cited source`;
+  };
   const fillLevels = () => {
     const projected = sb.year > LAST;
     if (!projected && sb.level === 'Predict') sb.level = 'D2';
@@ -1100,18 +1167,13 @@ function buildSandboxPanel() {
     $('sbLevel').value = sb.level;
   };
   $('sbCounty').value = sb.fips;
-  $('sbCrop').value = sb.crop;
   $('sbYear').value = sb.year;
-  $('sbPrice').value = sb.price.toFixed(2);
+  setCrop(sb.crop);
+  fillCrops();
   fillLevels();
 
-  $('sbCounty').addEventListener('change', (e) => { sb.fips = e.target.value; renderSandbox(); });
-  $('sbCrop').addEventListener('change', (e) => {
-    sb.crop = e.target.value;
-    sb.price = DATA.defaultPrice[sb.crop];
-    $('sbPrice').value = sb.price.toFixed(2);
-    renderSandbox();
-  });
+  $('sbCounty').addEventListener('change', (e) => { sb.fips = e.target.value; fillCrops(); renderSandbox(); });
+  $('sbCrop').addEventListener('change', (e) => { setCrop(e.target.value); renderSandbox(); });
   $('sbYear').addEventListener('change', (e) => { sb.year = Number(e.target.value); fillLevels(); renderSandbox(); });
   $('sbLevel').addEventListener('change', (e) => { sb.level = e.target.value; renderSandbox(); });
   $('sbPrice').addEventListener('change', (e) => { const v = Number(e.target.value); if (v >= 0) { sb.price = v; renderSandbox(); } });
@@ -1149,7 +1211,7 @@ function setPanelHidden(hidden) {
   $('panelBtn').textContent = hidden ? 'Show panel' : 'Hide panel';
   store.set('droughtViewerPanelHidden', hidden ? '1' : '0');
   resizeRenderer();
-  if (!hidden && app.mode === 'history') drawChart(byFips.get(app.fips), yearIndex(app.year));
+  if (!hidden && app.mode === 'history' && byFips.get(app.fips).crops[app.crop]) drawChart(byFips.get(app.fips), yearIndex(app.year));
 }
 
 function setupUI() {
@@ -1191,9 +1253,11 @@ function setupUI() {
     if (!hit) { tip.classList.add('hidden'); return; }
     const c = byFips.get(app.hoverFips), v = stateMap.value(app.hoverFips);
     tip.innerHTML = v.missing
-      ? `<b>${c.name}</b><br>No data: not in the master dataset`
-      : `<b>${c.name}</b> - ${app.year}<br>Drought: ${levelText(v.sev)}<br>Est. crop loss: ${money(v.dollars)}` +
-        '<br><span class="muted">Click to open the diorama</span>';
+      ? `<b>${c.name}, ${c.state}</b><br>No data: not in the master dataset`
+      : v.noCrop
+        ? `<b>${c.name}, ${c.state}</b><br>No ${cropName(app.crop).toLowerCase()} records<br><span class="muted">Click to open the diorama</span>`
+        : `<b>${c.name}, ${c.state}</b> - ${app.year}<br>Drought: ${levelText(v.sev)}<br>Est. ${cropName(app.crop).toLowerCase()} loss: ${money(v.dollars)}` +
+          '<br><span class="muted">Click to open the diorama</span>';
     tip.style.left = Math.min(e.clientX - rect.left + 14, rect.width - 250) + 'px';
     tip.style.top = (e.clientY - rect.top + 14) + 'px';
     tip.classList.remove('hidden');
