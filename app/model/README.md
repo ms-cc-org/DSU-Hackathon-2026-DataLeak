@@ -25,11 +25,20 @@ else `<repo>/app/usda_budget_data`.
 | `analog.py` | Strategy C: k nearest training county-years (same crop), neighbour range + explanation |
 | `evaluate.py` | tuning, walk-forward 2006-2012, validation 2013-2015, metrics, model choice, report |
 | `final_test.py` | plan section 5 |
-| `budget.py` | plan sections 6-7: X, Y, Z, ranges, extrapolation warning (import this from Streamlit) |
+| `budget.py` | plan sections 6-7: X, Y, Z, calibration factors, ranges (`statewide_range`), extrapolation warning (import this from Streamlit) |
 | `results/` | generated reports and csv files |
 
 Each model has `fit(train, target)`, `predict(df)` (expected share) and `score(df)` (ranking score).
 Targets: T1 `drought_payout_share`, T2 `drought_loss_acre_share`. Sample weight = `liability`.
+
+## Calibration
+
+Each model x target (T1 payout share, T2 damaged-acre share) gets k = Σ actual / Σ predicted, computed from that model's WALK-FORWARD
+predictions (2006-2012) only and saved in `results/calibration.csv`. Predictions are multiplied by k in `evaluate.py`, `final_test.py` and
+`budget.py` (`calibrate`, `calibrated_components`). It is a constant per model, so budget capture and AUC cannot change (checked). Walk-forward
+"after" numbers are in-sample for k; validation is the honest test. Because k is dominated by the 2012 drought it over-corrects quiet years
+(B0 and B1 get worse on validation). `budget.statewide_range()` returns the chosen model's calibrated statewide point estimate and a rough
+10th-90th percentile range (the best-covering method, currently C's look-alike spread), widened when the point estimate falls outside it.
 
 ## Choices made where the plan left room
 
@@ -58,27 +67,18 @@ Targets: T1 `drought_payout_share`, T2 `drought_loss_acre_share`. Sample weight 
 - Budget arithmetic (`budget.py`) uses `liability`, `insured_acres`, `avg_coverage`, `full_crop_value` from labels.csv; these are
   Aug-15 exposure numbers used after prediction, never as model inputs.
 
-## What the validation run showed (full tables in `results/validation_report.md`)
+## What the validation run showed (full tables in `results/validation_report.md`, calibrated predictions)
 
-Pooled out-of-sample, walk-forward 2006-2012 + validation 2013-2015 (20 state-years), T1 payout share:
+See the report for walk-forward, validation and pooled tables (A), drought vs quiet years (B), per state-year totals with ranges (C), both
+targets (D), known misses (E), the verdict (F) and the report-only dollar-target side check (G). Points to keep in mind:
 
-| | top-20 capture | dollar WAPE | 80% range coverage |
-|---|---|---|---|
-| B0 average | 26.5% | 1.35 | - |
-| B1 drought-map rule | 28.9% | 1.08 | - |
-| A hurdle | 44.4% | 0.88 | 50% |
-| B boosting (chosen) | 43.8% | 0.64 | 35% |
-| C look-alikes | 40.2% | 0.76 | 80% |
-| random counties | 21.5% | | |
-
-B clearly beats B1 (about +15 capture points, 41% lower dollar error). A matches B on capture but has higher dollar error, so there
-is no simpler model within noise and B is chosen. Caveats:
-
-- Only three of the 20 state-years are drought years (Iowa and Nebraska 2012, Iowa 2013). In those B under-budgets (0.68 of actual).
-- Iowa 2013 is missed by every model: the drought began after Aug 15 (statewide D2+ area 0% from May 28 through Aug 13, 21% on
-  Aug 27, 42% on Sep 10). Not tuned for.
-- Ranges are rough. Whole-year resampling of 7 walk-forward years gives A and B lopsided, narrow ranges (50% and 35% coverage); the
-  look-alike spread (C) reaches 80% pooled (86% walk-forward, 67% validation, only 6 state-years), so `budget.py` uses it.
+- Boosting (B) and the hurdle model (A) have the same budget capture (about 44%, random 21.5%, B1 29%); B has lower dollar error before
+  calibration. After calibration the plan's rule (simpler model if within noise) selects A, but that comes mostly from k being fitted
+  in-sample on 2012; on validation alone A and B are tied. Treat the A-vs-B choice as open.
+- Only three of the 20 out-of-sample state-years are drought years (Iowa and Nebraska 2012, Iowa 2013).
+- Iowa 2013 is missed by every model: the drought began after Aug 15 (statewide D2+ area 0% from May 28 through Aug 13, 21% on Aug 27,
+  42% on Sep 10). Not tuned for, and a constant calibration factor cannot fix it.
+- Ranges are rough: whole-year resampling of 7 walk-forward years gives A and B narrow, lopsided ranges (about 40-45% coverage); the
+  look-alike spread (C) reaches 80% pooled (16/20; only 6 validation state-years).
 - `yield_prev5_mean` / `acres_planted_prev3_mean` are missing only for 2000-2002, so A's missing-flag columns (and B's native
-  NaN splits) can act as a weak year proxy during training. This follows the plan as written; changing it would be a post-hoc decision.
-- Quiet years are over-budgeted by every model (B about 1.6x in walk-forward).
+  NaN splits) can act as a weak year proxy during training.

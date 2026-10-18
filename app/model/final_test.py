@@ -2,7 +2,8 @@
 
     python app/model/final_test.py --i-am-sure
 
-Retrains B0, B1, A, B, C on 2000-2015 with the hyper-parameters tuned in evaluate.py (no re-tuning),
+Retrains B0, B1, A, B, C on 2000-2015 with the hyper-parameters tuned in evaluate.py and the calibration factors k from results/calibration.csv
+(walk-forward 2006-2012; no re-tuning, no re-fitting of k),
 predicts 2016-2025, computes the same metrics and writes results/test_report.md (+ csv files).
 Do not change the model after seeing these results; report failures too. Expected hard cases:
 2020 Iowa (derecho: a wind loss, mostly not drought-coded) and quiet years.
@@ -16,7 +17,7 @@ import pandas as pd
 
 from budget import residual_pool
 from data import RESULTS, load_usable
-from evaluate import (LABEL, MODELS, fit_predict, md, metric_tables, metrics, range_rows, statewide_totals,
+from evaluate import (LABEL, MODELS, apply_k, fit_predict, md, metric_tables, metrics, range_rows, statewide_totals,
                       totals_wide)
 
 
@@ -25,7 +26,7 @@ def run_final(train_splits, eval_split, out_dir, allow_test=False):
     params, chosen = params_file["params"], params_file["chosen"]
     train = load_usable(*train_splits)
     test = load_usable(eval_split, allow_test=allow_test)
-    pred = fit_predict(train, test, params)
+    pred = apply_k(fit_predict(train, test, params), pd.read_csv(RESULTS / "calibration.csv"))   # k from walk-forward 2006-2012
 
     m = metrics(pred)
     tot = statewide_totals(pred)

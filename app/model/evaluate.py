@@ -11,6 +11,9 @@ Protocol (fixed before looking at any results):
   * 80% ranges: A and B resample WHOLE past years' residuals (all counties of a year together; walk-forward
     years 2006-2012, own year left out); C uses its neighbours' spread. The method closest to 80% coverage on
     walk-forward + validation is recorded in results/range_method.json and used by budget.py, labelled "rough".
+  * Calibration: every model x target gets k = sum(actual) / sum(predicted) fitted on its WALK-FORWARD predictions (2006-2012)
+    only (results/calibration.csv) and its predictions are multiplied by k. Constant scaling, so capture and AUC cannot change.
+    Walk-forward "after" numbers are therefore in-sample for k; validation is the honest check.
   * testing/ is never read here (data.load_split refuses it). Nothing is tuned for any particular year.
 Outputs go to app/model/results/ (validation_report.md, validation_results.csv, ...).
 """
@@ -26,12 +29,13 @@ from analog import Analog
 from baselines import B0, B1
 from budget import RANGE_LABEL, budget_components, residual_pool, total_range
 from data import CARRY, KEY, REPO, RESULTS, T1, T2, add_year_class, load_usable
-from gbm import GBM
+from gbm import GBM, GBMDollars
 from hurdle import Hurdle
 
 MODELS = ["B0", "B1", "A", "B", "C"]
 LABEL = {"B0": "B0 average", "B1": "B1 drought-map rule", "A": "A hurdle", "B": "B boosting",
-         "C": "C look-alikes", "Random": "Random counties", "Oracle": "Oracle (perfect ranking)"}
+         "C": "C look-alikes", "Random": "Random counties", "Oracle": "Oracle (perfect ranking)",
+         "BD": "B$ ($ target, uncalibrated)", "BDc": "B$ ($ target, calibrated)"}
 SIMPLEST_FIRST = ["A", "C", "B"]
 RANGED = ["A", "B", "C"]
 WF_YEARS = list(range(2006, 2013))
@@ -371,8 +375,8 @@ def known_misses(pts, liab):
     return pd.DataFrame(rows), facts
 
 
-def state_year_md(pts, cov, class_of, years):
-    """Section C table: actual, each model's prediction and (A, B, C) 80% range with ✓ inside / ✗ outside."""
+def state_year_md(pts, cov, class_of, years, bud=None, budget_label="budget range"):
+    """Section C table: actual, each model's prediction and (A, B, C) 80% range with ✓ inside / ✗ outside; optional budget range."""
     rows = []
     for (s, y), g in pts[pts.year.isin(years)].groupby(["state_alpha", "year"]):
         a = g.actual.iloc[0]
@@ -384,65 +388,195 @@ def state_year_md(pts, cov, class_of, years):
                 c = cov[(cov.model == m) & (cov.state == s) & (cov.year == y)].iloc[0]
                 cell += f" [{c.low / 1e6:,.1f}–{c.high / 1e6:,.1f}] {'✓' if c.inside else '✗'}"
             row[LABEL[m] + (" (pred [80% range])" if m in RANGED else "")] = cell
+        if bud is not None:
+            b = bud.loc[(s, y)]
+            row[budget_label] = f"[{b.budget_low / 1e6:,.1f}–{b.budget_high / 1e6:,.1f}] {'✓' if b.inside else '✗'}"
         rows.append(row)
     return pd.DataFrame(rows)
 
 
-def verdict_text(pooled, m_val, verdict, rng_pooled, best_range):
-    P, V = pooled[pooled.group == "all"].set_index("model"), m_val[m_val.group == "all"].set_index("model")
-    ch = verdict["chosen"]
-    c, b1 = P.loc[ch], P.loc["B1"]
-    d_cap, wape_red = c.capture_top20 - b1.capture_top20, 1 - c.wape / b1.wape
-    if d_cap > CAPTURE_NOISE and wape_red > WAPE_NOISE:
-        kind = "a clear win"
-    elif d_cap < -CAPTURE_NOISE and wape_red < -WAPE_NOISE:
-        kind = "a loss"
-    elif abs(d_cap) <= CAPTURE_NOISE and abs(wape_red) <= WAPE_NOISE:
-        kind = "a tie"
-    else:
-        kind = "mixed (better on one measure, within noise or worse on the other)"
+# ------------------------------------------------------------------ calibration
+def fit_calibration(wf):
+    """k = sum(actual) / sum(predicted) per model x target, from walk-forward predictions only (T2: damaged acres)."""
+    rows = []
+    for t, sp in SPEC.items():
+        act = actual_amount(wf, t).sum()
+        for m in MODELS:
+            pred = (wf[f"{t}_{m}"] * wf[sp["weight"]]).sum()
+            rows.append({"target": t, "model": m, "k": act / pred, "unit": sp["unit"], "walk_forward_actual": act,
+                         "walk_forward_predicted": pred, "walk_forward_rows": len(wf), "fit_years": "2006-2012"})
+    return pd.DataFrame(rows)
+
+
+def apply_k(frame, cal):
+    """Multiply every model's predictions (and C's neighbour quantiles) by its k. Ranking scores of B0/B1/B/C follow the
+    rescaled predictions; A's score is its part-1 probability, which is not rescaled."""
+    k = {(r.model, r.target): r.k for r in cal.itertuples()}
+    out = frame.copy()
+    for m in MODELS:
+        for t in SPEC:
+            out[f"{t}_{m}"] = frame[f"{t}_{m}"] * k[(m, t)]
+        if m != "A":
+            out[f"score_{m}"], out[f"score2_{m}"] = out[f"t1_{m}"], out[f"t2_{m}"]
+    for t in SPEC:
+        for q in ("lo", "hi"):
+            out[f"{t}_C_{q}"] = frame[f"{t}_C_{q}"] * k[("C", t)]
+    return out
+
+
+def invariance(Mb, Ma):
+    """Largest before/after difference in budget capture and AUC (should be ~0: constant scaling keeps rankings)."""
+    keys = ["split", "target", "group", "model"]
+    j = Mb.merge(Ma, on=keys, suffixes=("_b", "_a"))
+    return {c: float(np.nanmax(np.abs(j[f"{c}_b"] - j[f"{c}_a"]))) for c in ["capture_top20", "auc_any_payout"]}
+
+
+def budget_range_rows(cov, chosen, method):
+    """The budget range: the best validated range method, widened where needed so the chosen model's calibrated point
+    estimate lies inside it. cov = range_rows(...) for T1."""
+    r = cov[cov.model == method].set_index(["state", "year"])
+    out = r[["low", "high", "actual", "sy_class"]].copy()
+    out["point"] = cov[cov.model == chosen].set_index(["state", "year"]).point
+    out["point_inside"] = (out.point >= out.low) & (out.point <= out.high)
+    out["budget_low"], out["budget_high"] = np.minimum(out.low, out.point), np.maximum(out.high, out.point)
+    out["widened"] = ~out.point_inside
+    out["inside"] = (out.actual >= out.budget_low) & (out.actual <= out.budget_high)
+    return out
+
+
+def validation_predictions(vp_raw, vp_cal, cal):
+    """One row per county x crop x year x model: predicted vs actual share, dollars and damaged acres (calibrated)."""
+    k = {(r.model, r.target): r.k for r in cal.itertuples()}
+    base = ["fips", "county_name", "state_alpha", "crop", "year", "liability", "insured_acres"]
+    rows = []
+    for m in MODELS:
+        d = vp_cal[base].copy()
+        d.insert(5, "model", m)
+        d["k_t1"], d["k_t2"] = k[(m, "t1")], k[(m, "t2")]
+        d["pred_share_t1_uncalibrated"], d["pred_share_t1"] = vp_raw[f"t1_{m}"], vp_cal[f"t1_{m}"]
+        d["actual_share_t1"] = vp_cal.t1_actual
+        d["pred_usd"], d["actual_usd"] = vp_cal[f"t1_{m}"] * vp_cal.liability, vp_cal.drought_indemnity.fillna(0)
+        d["pred_share_t2_uncalibrated"], d["pred_share_t2"] = vp_raw[f"t2_{m}"], vp_cal[f"t2_{m}"]
+        d["actual_share_t2"] = vp_cal.t2_actual
+        d["pred_damaged_acres"] = vp_cal[f"t2_{m}"] * vp_cal.insured_acres
+        d["actual_damaged_acres"] = vp_cal.drought_loss_acres.fillna(0)
+        rows.append(d)
+    return pd.concat(rows, ignore_index=True)
+
+
+def side_check(train, val, wfc, vpc, params):
+    """Optional report-only check: boosting on drought payout in dollars with liability as a feature (GBMDollars), next to
+    the calibrated share version of B. The dollar model gets its own k from walk-forward, like every other model."""
+    usd = []
+    for y in WF_YEARS:
+        te = train[train.year == y]
+        usd.append(GBMDollars(**params["B"]).fit(train[train.year < y]).predict_usd(te))
+    wf_usd = np.concatenate(usd)
+    vp_usd = GBMDollars(**params["B"]).fit(train).predict_usd(val)
+    k = wfc.drought_indemnity.fillna(0).sum() / wf_usd.sum()
+    out = {}
+    for name, frame, u in [("walk-forward", wfc, wf_usd), ("validation", vpc, vp_usd)]:
+        f = frame.copy()
+        f["t1_BD"], f["t1_BDc"] = u / f.liability, k * u / f.liability
+        f["t2_BD"] = f["t2_BDc"] = f["t2_B"]
+        f["score_BD"], f["score_BDc"] = f.t1_BD, f.t1_BDc
+        f["score2_BD"] = f["score2_BDc"] = f["score2_B"]
+        out[name] = metrics(f, names=["B", "BD", "BDc"], t="t1")
+        out[name].insert(0, "split", name)
+    return pd.concat(out.values(), ignore_index=True), k
+
+
+def pick(M, model, t="t1", split="validation", grp="all"):
+    r = M[(M.target == t) & (M.split == split) & (M.group == grp) & (M.model == model)]
+    return r.iloc[0]
+
+
+def verdict_text(ctx):
+    """3-5 sentences: did calibration help, does the chosen model win under the plan's rule, what looks off."""
+    Ma, Mb, ch, vd = ctx["metrics"], ctx["metrics_before"], ctx["verdict"]["chosen"], ctx["verdict"]
+    P = Ma[(Ma.target == "t1") & (Ma.split == "pooled") & (Ma.group == "all")].set_index("model")
+    ba = {m: (pick(Mb, m), pick(Ma, m)) for m in MODELS}
+    closer = [m for m in MODELS if abs(ba[m][1].calibration - 1) < abs(ba[m][0].calibration - 1)]
+    cb, ca = ba[ch]
+    helped = abs(ca.calibration - 1) < abs(cb.calibration - 1) and ca.wape < cb.wape
+    worse = [LABEL[m] for m in MODELS if ba[m][1].wape > ba[m][0].wape * 1.05]
+    b1 = P.loc["B1"]
+    c = P.loc[ch]
     near = [m for m in SIMPLEST_FIRST if P.loc[m, "capture_top20"] >= P.loc[RANGED, "capture_top20"].max() - CAPTURE_NOISE
             and P.loc[m, "wape"] <= P.loc[RANGED, "wape"].min() * (1 + WAPE_NOISE)]
-    others = [m for m in RANGED if m != ch]
-    cv = rng_pooled.set_index("model").range_cov
-    D = pooled[pooled.group == "drought"].set_index("model")
-    if len(near) == 1:
-        rule = (f"Applying the plan's rule (take the simpler model when two are within noise): no simpler model is within noise of {ch} on both "
-                f"measures ({'; '.join(f'{m}: capture {P.loc[m, 'capture_top20']:.1%}, WAPE {P.loc[m, 'wape']:.2f}' for m in others)}), so {ch} is chosen.")
-    elif near:
-        rule = (f"Applying the plan's rule, {', '.join(near)} are within noise of the best on both measures, so the simplest of them, {ch}, is chosen.")
+    inv = ctx["invariance"]
+    bud = ctx["bud"]
+    rc = ctx["rng_cov"]
+    further = [m for m in MODELS if abs(ba[m][1].calibration - 1) > abs(ba[m][0].calibration - 1)]
+    bb, bA = ba["B"]
+    s = []
+    s.append(f"**Calibration {'helped' if helped else 'did not clearly help'}**: on validation (out-of-sample for k) Σpred/Σactual moved closer to 1 for "
+             f"{', '.join(LABEL[m] for m in closer) or 'no model'} and further from 1 for {', '.join(LABEL[m] for m in further) or 'no model'}; "
+             f"for B boosting it went {bb.calibration:.2f} → {bA.calibration:.2f} with dollar error (WAPE) {bb.wape:.2f} → {bA.wape:.2f}"
+             + (f", and for {LABEL[ch]} {cb.calibration:.2f} → {ca.calibration:.2f} with WAPE {cb.wape:.2f} → {ca.wape:.2f}" if ch != "B" else "")
+             + f"; budget capture and AUC are unchanged (largest change {inv['capture_top20']:.1e} and {inv['auc_any_payout']:.1e}).")
+    flipped = ch != ctx["verdict_before"]["chosen"]
+    if len(near) == 1 and near[0] == ch:
+        rule = (f"Under the plan's rule {LABEL[ch]} {'still ' if not flipped else ''}wins: no simpler model is within noise of it on both "
+                f"capture ({CAPTURE_NOISE * 100:.0f} points) and WAPE ({WAPE_NOISE:.0%}) once all models are calibrated "
+                f"({'; '.join(f'{m}: capture {P.loc[m, 'capture_top20']:.1%}, WAPE {P.loc[m, 'wape']:.2f}' for m in RANGED if m != ch)}).")
     else:
-        rule = "No model is near-best on both measures, so the lowest combined rank is chosen."
-    s = [f"**{LABEL[ch]} wins.** Over the 20 pooled out-of-sample state-years (walk-forward 2006-2012 + validation 2013-2015) it puts "
-         f"{c.capture_top20:.1%} of actual drought payouts in its top-20 counties (B1: {b1.capture_top20:.1%}, random: "
-         f"{P.loc['Random', 'capture_top20']:.1%}) and its county-level dollar error (WAPE) is {c.wape:.2f} versus {b1.wape:.2f} for B1, "
-         f"{wape_red:.0%} lower.",
-         f"Against B1 (the drought-map rule) this is **{kind}**: capture is {d_cap * 100:+.1f} points and dollar error {wape_red:.0%} lower, "
-         f"judged against noise bands of {CAPTURE_NOISE * 100:.0f} capture points and {WAPE_NOISE:.0%} of WAPE.",
-         rule,
-         f"Caveats: only {int(D.loc[ch, 'state_years'])} of the 20 state-years are drought years (Iowa and Nebraska 2012, Iowa 2013), where "
-         f"{LABEL[ch]} under-budgets (Σpred/Σactual {D.loc[ch, 'calibration']:.2f}), and on validation alone (2013-2015) it has capture "
-         f"{V.loc[ch, 'capture_top20']:.1%} vs {V.loc['B1', 'capture_top20']:.1%} for B1 and WAPE {V.loc[ch, 'wape']:.2f} vs {V.loc['B1', 'wape']:.2f}, "
-         "with its one drought state-year (Iowa 2013) beginning after Aug 15 and invisible to every model.",
-         "Budget ranges are rough: pooled 80%-range coverage is " + ", ".join(f"{m} {cv[m] * 100:.0f}%" for m in RANGED)
-         + f" (target ~80%), so {best_range} is used in budget.py and labelled rough."]
+        rule = (f"Under the plan's rule the pick is {LABEL[ch]}: models {', '.join(near) if near else '(none)'} are within noise of the best on both "
+                f"capture ({CAPTURE_NOISE * 100:.0f} points) and WAPE ({WAPE_NOISE:.0%}) once all models are calibrated, so the simplest of them wins"
+                + (f"; before calibration it was {LABEL[ctx['verdict_before']['chosen']]}." if flipped else "."))
+    s.append(rule)
+    s.append(f"Against B1 (also calibrated) {LABEL[ch]} has pooled capture {c.capture_top20:.1%} vs {b1.capture_top20:.1%} and WAPE {c.wape:.2f} vs {b1.wape:.2f} "
+             f"({1 - c.wape / b1.wape:.0%} lower).")
+    flags = ["k is fitted on walk-forward predictions, so the pooled walk-forward 'after' figures are in-sample for k and only validation tests it"]
+    if further:
+        flags.append("k comes from a window dominated by the 2012 drought, so it over-corrects quiet years: "
+                     + ", ".join(f"{LABEL[m]} Σpred/Σactual {ba[m][0].calibration:.2f} → {ba[m][1].calibration:.2f}" for m in further) + " on validation")
+    if flipped:
+        va_, vb_ = pick(Ma, ch), pick(Ma, ctx["verdict_before"]["chosen"])
+        flags.append(f"the pick moved from {LABEL[ctx['verdict_before']['chosen']]} to {LABEL[ch]} mainly because k_{ch} rescales its 2012 over-prediction in-sample; "
+                     f"on validation alone WAPE is {va_.wape:.2f} for {ch} vs {vb_.wape:.2f} for {ctx['verdict_before']['chosen']}")
+    if abs(ca.calibration - 1) > 0.25:
+        flags.append(f"{LABEL[ch]} still {'under' if ca.calibration < 1 else 'over'}-budgets on validation ({ca.calibration:.2f}), mostly Iowa 2013, which no Aug-15 input can show")
+    flags.append(f"{int((~bud.point_inside).sum())} of {len(bud)} state-years needed the {ctx['best_range']} range widened to contain {ch}'s point estimate")
+    s.append("What looks off: " + "; ".join(flags) + ".")
+    s.append("Ranges stay rough: pooled 80%-range coverage after calibration is " + ", ".join(f"{m} {rc[m] * 100:.0f}%" for m in RANGED)
+             + f" and {ctx['bud_cov_pooled'] * 100:.0f}% for the budget range ({ctx['best_range']}, widened around {ch}'s point).")
     return " ".join(s)
 
 
+def before_after_md(Mb, Ma, t, unit):
+    rows = []
+    for m in MODELS:
+        b, a = pick(Mb, m, t), pick(Ma, m, t)
+        cov = "–" if m not in RANGED else f"{f_cov(b).split(' ')[0]} → {f_cov(a).split(' ')[0]}"
+        rows.append({"Model": LABEL[m], "Calibration (Σpred/Σactual)": f"{b.calibration:.2f} → {a.calibration:.2f}",
+                     "WAPE": f"{b.wape:.2f} → {a.wape:.2f}", "Budget capture": f"{f_pct(b.capture_top20, 1)} → {f_pct(a.capture_top20, 1)}",
+                     "AUC": f"{b.auc_any_payout:.3f} → {a.auc_any_payout:.3f}", "80% range coverage": cov})
+    return md(pd.DataFrame(rows))
+
+
 def write_report(ctx):
-    L, unit = LABEL, "$"
+    unit = "$"
     split_names = [("walk-forward", "Walk-forward (2006-2012)"), ("validation", "Validation (2013-2015)"),
                    ("pooled", "Pooled walk-forward + validation (basis for the verdict)")]
-    M = ctx["metrics"]
+    M, Mb = ctx["metrics"], ctx["metrics_before"]
     sel = lambda t, split, grp: M[(M.target == t) & (M.split == split) & (M.group == grp)]
     cls = ctx["class_of"]
+    ch, cal, bud = ctx["verdict"]["chosen"], ctx["cal"], ctx["bud"]
     drought_sy = {sp: sorted(f"{s} {y}" for (s, y), c in cls.items() if c == "drought" and y in ctx["years"][sp]) for sp in ctx["years"]}
-    out = [f"""# Validation report: walk-forward 2006-2012 and validation 2013-2015
+    kt = cal.pivot(index="model", columns="target", values="k").reindex(MODELS)
+    kt_tbl = pd.DataFrame({"Model": [LABEL[m] for m in MODELS], "k for T1 (payout $)": kt.t1.round(3).to_numpy(),
+                           "k for T2 (damaged acres)": kt.t2.round(3).to_numpy()})
+    inv = ctx["invariance"]
+    pt_in = int(bud.point_inside.sum())
+    out = [f"""# Validation report: walk-forward 2006-2012 and validation 2013-2015 (calibrated)
 
 Models are fitted on training years only (2000-2012 for validation; each fold's earlier years for walk-forward). **`testing/` was not
-read.** Amounts are predicted drought payout = predicted T1 x insured liability (dollars), summed over crops per county-year; T2 amounts
-are predicted damaged acres = T2 x insured acres. Rows used: {ctx['n_train']} training and {ctx['n_val']} validation (insured, liability > 0,
-RMA year available; zero payouts kept). Raw numbers: `validation_results.csv` (all metrics) and `validation_state_years.csv` (per state-year).
+read.** Every model's predictions are multiplied by its calibration factor k (see "Calibration"); all tables below use the calibrated
+predictions unless marked "before". Amounts are predicted drought payout = predicted T1 x insured liability (dollars), summed over crops per
+county-year; T2 amounts are predicted damaged acres = T2 x insured acres. Rows used: {ctx['n_train']} training and {ctx['n_val']} validation
+(insured, liability > 0, RMA year available; zero payouts kept). Raw numbers: `validation_results.csv` (all metrics, before and after
+calibration), `validation_state_years.csv` (per state-year), `validation_predictions.csv` (every county x crop x year x model).
 
 How to read the tables. *Statewide total error* = mean over state-years of |predicted - actual| / actual for the statewide total.
 *Weighted MAE* = mean absolute error per county-year in dollars (acres for T2); in absolute dollars, so big counties weigh more.
@@ -453,31 +587,57 @@ falls inside the 10th-90th percentile range (target ~80%; k/n shown). **Bold = b
 A "drought year" is a state-year whose actual statewide drought payout is >= 3% of insured dollars; all others are "quiet".
 Percent errors on statewide totals are huge in quiet years (a tiny actual total makes any miss a big percentage), so read them next to the dollar columns.
 
-How the 80% ranges are built. A and B: whole past years' residuals (walk-forward 2006-2012, out-of-sample) are resampled one year at a
-time, the same year's residual applied to every county together (droughts hit counties together; never row by row), and the 10th-90th
-percentile of the resulting statewide totals is taken (own year left out). C: 10th-90th percentile of the liability-weighted shares of its
-k nearest look-alikes, every county at the same quantile. B0 and B1 have no range.
+How the 80% ranges are built. A and B: whole past years' residuals (walk-forward 2006-2012, out-of-sample, of the CALIBRATED predictions) are
+resampled one year at a time, the same year's residual applied to every county together (droughts hit counties together; never row by row), and the
+10th-90th percentile of the resulting statewide totals is taken (own year left out). C: 10th-90th percentile of the liability-weighted shares of its
+k nearest look-alikes (scaled by C's calibration factor), every county at the same quantile. B0 and B1 have no range. The budget range is the best
+of these ({ctx['best_range']}), widened where needed so the chosen model's ({ch}) calibrated point estimate lies inside it.
 
-Tuned on walk-forward only (criterion: pooled county-year dollar WAPE of T1): `{json.dumps(ctx['params'])}`.
+Tuned on walk-forward only (criterion: pooled county-year dollar WAPE of T1, before calibration): `{json.dumps(ctx['params'])}`.
+
+## Calibration
+
+Each model and target gets one multiplier k = Σ actual / Σ predicted, computed from that model's **walk-forward predictions (2006-2012) only**
+(T2: damaged acres instead of dollars), saved in `results/calibration.csv` and applied in evaluation and in `budget.py`. k > 1 means the model
+under-budgeted over 2006-2012 (dominated by the 2012 drought).
+
+{md(kt_tbl)}
+
+Budget capture and AUC are unchanged by a constant multiplier. Confirmed: the largest before/after difference over every split, target, group and
+model is {inv['capture_top20']:.2e} for capture and {inv['auc_any_payout']:.2e} for AUC.
+
+**Validation (2013-2015), before → after calibration, T1 payout share** (k from walk-forward, so this is out-of-sample):
+
+{before_after_md(Mb, M, 't1', '$')}
+
+**Validation, before → after, T2 damaged-acre share:**
+
+{before_after_md(Mb, M, 't2', 'acres')}
+
+Walk-forward "after" figures in the tables below are in-sample for k (k was fitted on those very predictions), so only the validation columns test
+the calibration. In the budget range, the chosen model's point estimate fell inside the {ctx['best_range']} range in {pt_in} of {len(bud)} state-years
+and the range was widened in the other {len(bud) - pt_in}; coverage of the widened budget range: walk-forward {ctx['bud_cov']['walk-forward']},
+validation {ctx['bud_cov']['validation']}.
 """]
-    out.append("## A. Summary (T1 payout share, all state-years)\n")
+    out.append("## A. Summary (T1 payout share, all state-years, calibrated)\n")
     for sp, title in split_names:
         out.append(f"**{title}**, {int(sel('t1', sp, 'all').state_years.iloc[0])} state-years\n\n{summary_md(sel('t1', sp, 'all'), unit)}\n")
-    out.append("## B. Drought years vs quiet years (T1)\n")
+    out.append("## B. Drought years vs quiet years (T1, calibrated)\n")
     for sp, title in split_names[:2]:
         for grp, gt in [("drought", "drought years"), ("quiet", "quiet years")]:
             t = sel("t1", sp, grp)
             if len(t):
+                n = int(t.state_years.iloc[0])
                 names = ", ".join(drought_sy[sp]) if grp == "drought" else "all other state-years"
-                out.append(f"**{title}: {gt}** ({int(t.state_years.iloc[0])} state-year{"s" if int(t.state_years.iloc[0]) != 1 else ""}: {names})\n\n{summary_md(t, unit)}\n")
+                out.append(f"**{title}: {gt}** ({n} state-year{'s' if n != 1 else ''}: {names})\n\n{summary_md(t, unit)}\n")
     out.append("Where a group holds only one or two state-years (validation drought years), treat the figures as anecdotes: range coverage "
                "there is 0 or 1 out of 1.\n")
-    out.append("## C. Statewide drought payout per state-year ($M): actual, each model's prediction, and the 80% range\n"
-               "Cell = prediction [low–high of the 80% range] ✓ if the actual falls inside the range, ✗ if outside. "
-               "Ranges for A, B, C only. T1 payout in $M.\n")
+    out.append("## C. Statewide drought payout per state-year ($M): actual, each calibrated model's prediction, and the 80% range\n"
+               "Cell = prediction [low–high of the 80% range] ✓ if the actual falls inside the range, ✗ if outside. Ranges for A, B, C use each model's own "
+               f"method; the last column is the budget range ({ctx['best_range']} range widened to include {ch}'s point estimate). T1 payout in $M.\n")
     for sp, title in split_names[:2]:
-        out.append(f"**{title}**\n\n{md(state_year_md(ctx['pts'], ctx['cov_t1'], cls, ctx['years'][sp]))}\n")
-    out.append("## D. Both targets\n\nT1 (payout share) is table A. T2 (damaged-acre share) uses the same layout; amounts are acres. "
+        out.append(f"**{title}**\n\n{md(state_year_md(ctx['pts'], ctx['cov_t1'], cls, ctx['years'][sp], bud, 'Budget range'))}\n")
+    out.append("## D. Both targets (calibrated)\n\nT1 (payout share) is table A. T2 (damaged-acre share) uses the same layout; amounts are acres. "
                "Out-of-pocket and relief calibration (which use T2) are in the appendix.\n")
     for sp, title in split_names:
         out.append(f"**T2 damaged-acre share: {title}**, all state-years\n\n{summary_md(sel('t2', sp, 'all'), 'acres')}\n")
@@ -488,28 +648,55 @@ Tuned on walk-forward only (criterion: pooled county-year dollar WAPE of T1): `{
                 out.append(f"**T2: {title}: {gt}**\n\n{summary_md(t, 'acres')}\n")
     out.append("## E. Known misses\n")
     mis = ctx["misses"]
-    out.append("State-years where **every** model's statewide T1 total was off by more than 50% (walk-forward + validation):\n")
+    out.append("State-years where **every** calibrated model's statewide T1 total was off by more than 50% (walk-forward + validation):\n")
     out.append(md(mis) if len(mis) else "None.")
     out.append("""
 - **Iowa 2013 is a known limitation, not tuned for.** The 2013 drought started after the Aug 15 decision date. Statewide D2+ area (weekly
   Drought Monitor in `data/processed/drought`) was 0% on every weekly map from late May through Aug 13, then rose to 21% on Aug 27 and 42%
   on Sep 10; the model inputs end Aug 14. Note that April 2013 maps still carried leftover 2012 drought ({a2:.0f}% mean D2+ area on Apr 2),
-  which the Apr 1 - Aug 14 features include; it had cleared by late May. No feature, model or hyper-parameter was changed to catch 2013.
+  which the Apr 1 - Aug 14 features include; it had cleared by late May. No feature, model or hyper-parameter was changed to catch 2013, and
+  calibration (a constant per model) cannot fix it either.
 - **Expected miss in the final test: Iowa 2020 (derecho).** The Aug 10, 2020 derecho caused wind losses that are mostly coded to a cause
   other than drought, so drought-payout models cannot predict them. Final-test results for 2020 Iowa should be read with that in mind.
 """.format(a2=(ctx["facts"] or {}).get("apr2", float("nan"))))
     out.append("## F. Verdict\n\n" + ctx["verdict_text"] + "\n")
+    sc = ctx["side"]
+    side_rows = []
+    for sp in ["walk-forward", "validation"]:
+        for m in ["B", "BD", "BDc"]:
+            r = sc[(sc.split == sp) & (sc.model == m) & (sc.group == "all")].iloc[0]
+            side_rows.append({"split": sp, "model": {"B": "B boosting: share target, calibrated", "BD": LABEL["BD"], "BDc": LABEL["BDc"]}[m],
+                              "WAPE": r.wape, "budget capture": r.capture_top20, "calibration": r.calibration, "AUC": r.auc_any_payout,
+                              "county MAE $M": r.county_mae / 1e6})
+    out.append(f"""## G. Side check (report only; no model switched): boosting on payout dollars with liability as a feature
+Same hyper-parameters as B, trained on drought payout in dollars (Poisson loss, `liability` added as a feature) instead of share x liability. Its k from
+walk-forward is {ctx['side_k']:.3f}. The share version of B is the calibrated one used everywhere else.
+
+{md(pd.DataFrame(side_rows))}
+""")
     out.append("## Appendix\n")
-    out.append("### Full T1 metric detail, pooled walk-forward + validation (includes out-of-pocket / relief calibration)\n\n"
+    out.append("### Full T1 metric detail, pooled walk-forward + validation, calibrated (includes out-of-pocket / relief calibration)\n\n"
                + metric_tables(M[(M.target == "t1") & (M.split == "pooled")].drop(columns="split")))
     out.append(f"### Strategy A coefficients (standardised features, largest first)\n`p_any_logit` = effect on the log-odds that drought "
                f"costs anything; `log_share_if_cost` = effect on log(payout share) when it does. Note `yield_prev5_mean_missing` and "
                f"`acres_planted_prev3_mean_missing` are only true for 2000-2002, so they can act as a weak year proxy in training.\n\n{md(ctx['coefs'])}\n")
     out.append(f"### Strategy B permutation importance on validation (drop in weighted R²)\n{md(ctx['imp'].head(10))}\n\n"
                "Partial dependence curves: `results/gbm_partial_dependence_validation.csv`.\n")
-    out.append(f"### Strategy C look-alikes for the three largest validation payouts\n{md(ctx['ex'][['county_name', 'state_alpha', 'crop', 'year', 'actual_$M', 'pred_$M', 'why']])}\n")
-    out.append(f"### Tuning grid (walk-forward WAPE, lower is better)\n{md(ctx['tune'].sort_values(['model', 'wape']))}\n")
+    out.append(f"### Strategy C look-alikes for the three largest validation payouts (calibrated)\n{md(ctx['ex'][['county_name', 'state_alpha', 'crop', 'year', 'actual_$M', 'pred_$M', 'why']])}\n")
+    out.append(f"### Tuning grid (walk-forward WAPE before calibration, lower is better)\n{md(ctx['tune'].sort_values(['model', 'wape']))}\n")
     (RESULTS / "validation_report.md").write_text("\n".join(out))
+
+
+def build_metrics(frames, oos_frame, years, pools):
+    all_m, covs = [], {}
+    for t in SPEC:
+        cov = range_rows(oos_frame, pools[t], t)
+        covs[t] = cov
+        for name, frame in frames.items():
+            m = attach_coverage(metrics(frame, t=t), cov[cov.year.isin(years[name])])
+            m.insert(0, "split", name)
+            all_m.append(m)
+    return pd.concat(all_m, ignore_index=True), covs
 
 
 def main():
@@ -522,49 +709,69 @@ def main():
     json.dump(params, open(RESULTS / "params.json", "w"), indent=2)
     print("tuned params:", params)
 
+    # raw predictions: walk-forward 2006-2012, and validation from models trained on all of 2000-2012
     wf = walk_forward(train, params)
     vp = fit_predict(train, val, params)
     vp["split"] = "validation"
     oos = pd.concat([wf, vp], ignore_index=True)
-    frames = {"walk-forward": wf, "validation": vp, "pooled": oos}
-    years = {k: set(int(y) for y in f.year.unique()) for k, f in frames.items()}
+    years = {"walk-forward": set(wf.year.astype(int)), "validation": set(vp.year.astype(int)), "pooled": set(oos.year.astype(int))}
 
-    pools = {t: {m: residual_pool(wf, m, t) for m in ["A", "B"]} for t in SPEC}
-    all_metrics, cov_all = [], {}
-    for t in SPEC:
-        cov = range_rows(oos, pools[t], t)
-        cov_all[t] = cov
-        for name, frame in frames.items():
-            m = attach_coverage(metrics(frame, t=t), cov[cov.year.isin(years[name])])
-            m.insert(0, "split", name)
-            all_metrics.append(m)
-    M = pd.concat(all_metrics, ignore_index=True)
-    M.to_csv(RESULTS / "validation_results.csv", index=False)
+    # calibration: k from walk-forward predictions only, applied everywhere
+    cal = fit_calibration(wf)
+    cal.to_csv(RESULTS / "calibration.csv", index=False)
+    wfc, vpc = apply_k(wf, cal), apply_k(vp, cal)
+    oosc = pd.concat([wfc, vpc], ignore_index=True)
+    print(cal.pivot(index="model", columns="target", values="k").reindex(MODELS).round(3))
 
-    pts = {t: state_year_points(oos, t) for t in SPEC}
-    sy_rows = []
-    for t in SPEC:
-        p = pts[t].rename(columns={"state_alpha": "state", "pred": "point"})
-        c = cov_all[t][["model", "state", "year", "low", "high", "inside"]]
-        sy_rows.append(p.merge(c, on=["model", "state", "year"], how="left").assign(target=t))
-    pd.concat(sy_rows).to_csv(RESULTS / "validation_state_years.csv", index=False)
-    statewide_totals(oos).to_csv(RESULTS / "validation_budget_totals.csv", index=False)
+    raw_frames = {"walk-forward": wf, "validation": vp, "pooled": oos}
+    cal_frames = {"walk-forward": wfc, "validation": vpc, "pooled": oosc}
+    pools_raw = {t: {m: residual_pool(wf, m, t) for m in ["A", "B"]} for t in SPEC}
+    pools_cal = {t: {m: residual_pool(wfc, m, t) for m in ["A", "B"]} for t in SPEC}
+    Mb, _ = build_metrics(raw_frames, oos, years, pools_raw)
+    Ma, cov_cal = build_metrics(cal_frames, oosc, years, pools_cal)
+    inv = invariance(Mb, Ma)
+    print("calibration leaves capture / AUC unchanged; max diffs:", inv)
+    pd.concat([Mb.assign(calibrated=False), Ma.assign(calibrated=True)]).to_csv(RESULTS / "validation_results.csv", index=False)
 
-    keep = (KEY + ["state_alpha", "split", "liability", "insured_acres", "t1_actual", "t2_actual"]
-            + [f"t{i}_{m}" for i in (1, 2) for m in MODELS] + ["t1_C_lo", "t1_C_hi", "t2_C_lo", "t2_C_hi"])
-    oos[keep].to_csv(RESULTS / "oos_predictions.csv", index=False)
-
-    pooled_t1 = M[(M.target == "t1") & (M.split == "pooled")]
+    pooled_t1 = Ma[(Ma.target == "t1") & (Ma.split == "pooled")]
     verdict = choose(pooled_t1)
-    verdict["params"] = params
+    verdict_before = choose(Mb[(Mb.target == "t1") & (Mb.split == "pooled")])
+    verdict.update(params=params, chosen_before_calibration=verdict_before["chosen"],
+                   note="pre-declared rule applied to pooled calibrated metrics; walk-forward part is in-sample for k, see validation_report.md section F")
     json.dump(verdict, open(RESULTS / "chosen_model.json", "w"), indent=2)
+    ch = verdict["chosen"]
 
     rng_pooled = pooled_t1[(pooled_t1.group == "all") & pooled_t1.model.isin(RANGED)][["model", "range_cov", "range_k", "range_n"]]
-    best_range = (rng_pooled.assign(gap=(rng_pooled.range_cov - 0.8).abs()).sort_values(["gap", "model"]).model.iloc[0])
+    best_range = rng_pooled.assign(gap=(rng_pooled.range_cov - 0.8).abs()).sort_values(["gap", "model"]).model.iloc[0]
+    bud = budget_range_rows(cov_cal["t1"], ch, best_range)
+    bud_cov = {sp: f"{int(bud[bud.index.get_level_values('year').isin(years[sp])].inside.sum())}/{int(bud.index.get_level_values('year').isin(years[sp]).sum())}"
+               for sp in ["walk-forward", "validation"]}
+    bud_cov_pooled = float(bud.inside.mean())
     json.dump({"method": best_range, "label": RANGE_LABEL, "pooled_coverage": {r.model: r.range_cov for r in rng_pooled.itertuples()},
-               "target": 0.8, "note": "no method is tuned to hit 80%; the closest on walk-forward + validation is used and labelled rough"},
+               "target": 0.8, "chosen_point_inside_range": f"{int(bud.point_inside.sum())}/{len(bud)}",
+               "budget_range_coverage_pooled": bud_cov_pooled,
+               "note": "no method is tuned to hit 80%; the closest on calibrated walk-forward + validation is used, widened to include the "
+                       "chosen model's point estimate, and labelled rough"},
               open(RESULTS / "range_method.json", "w"), indent=2)
 
+    # saved predictions
+    keep = (KEY + ["state_alpha", "split", "liability", "insured_acres", "t1_actual", "t2_actual"]
+            + [f"t{i}_{m}" for i in (1, 2) for m in MODELS] + ["t1_C_lo", "t1_C_hi", "t2_C_lo", "t2_C_hi"])
+    oosc[keep].to_csv(RESULTS / "oos_predictions.csv", index=False)       # calibrated; walk-forward + validation
+    validation_predictions(vp, vpc, cal).to_csv(RESULTS / "validation_predictions.csv", index=False)
+    pts_cal = {t: state_year_points(oosc, t) for t in SPEC}
+    sy_rows = []
+    for t in SPEC:
+        p = pts_cal[t].rename(columns={"state_alpha": "state", "pred": "point"})
+        c = cov_cal[t][["model", "state", "year", "low", "high", "inside"]]
+        sy_rows.append(p.merge(c, on=["model", "state", "year"], how="left").assign(target=t, calibrated=True))
+    b = bud.reset_index().rename(columns={"budget_low": "blow", "budget_high": "bhigh"})
+    sy_rows.append(pd.DataFrame({"model": "Budget", "state": b.state, "year": b.year, "point": b.point, "actual": b.actual,
+                                 "low": b.blow, "high": b.bhigh, "inside": b.inside, "target": "t1", "calibrated": True}))
+    pd.concat(sy_rows).to_csv(RESULTS / "validation_state_years.csv", index=False)
+    statewide_totals(oosc).to_csv(RESULTS / "validation_budget_totals.csv", index=False)
+
+    # explanations (unchanged by calibration)
     a = Hurdle().fit(train, T1)
     coef = a.coefficients()
     coef.to_csv(RESULTS / "hurdle_coefficients.csv", index=False)
@@ -577,19 +784,24 @@ def main():
     c = Analog(**params["C"]).fit(train, T1)
     ex = val.nlargest(3, "drought_indemnity").reset_index(drop=True)
     ex["why"] = c.explain(ex)
-    ex["pred_$M"] = c.predict(ex) * ex.liability / 1e6
+    ex["pred_$M"] = c.predict(ex) * float(cal[(cal.model == "C") & (cal.target == "t1")].k.iloc[0]) * ex.liability / 1e6
     ex["actual_$M"] = ex.drought_indemnity / 1e6
 
-    classed = add_year_class(oos)
-    class_of = classed.drop_duplicates(["state_alpha", "year"]).set_index(["state_alpha", "year"]).sy_class.to_dict()
-    liab = oos.groupby(["state_alpha", "year"]).liability.sum()
-    misses, facts = known_misses(pts["t1"], liab)
-    vt = verdict_text(pooled_t1, M[(M.target == "t1") & (M.split == "validation")], verdict, rng_pooled, best_range)
-    write_report(dict(metrics=M, params=params, n_train=len(train), n_val=len(val), class_of=class_of, years=years,
-                      pts=pts["t1"], cov_t1=cov_all["t1"], misses=misses, facts=facts, verdict_text=vt, coefs=coefs,
-                      imp=imp, ex=ex, tune=tune_tbl))
-    print(json.dumps(verdict, indent=2))
-    print("range method:", best_range)
+    side, side_k = side_check(train, val, wfc, vpc, params)
+    side.to_csv(RESULTS / "side_check_dollar_target.csv", index=False)
+
+    class_of = add_year_class(oosc).drop_duplicates(["state_alpha", "year"]).set_index(["state_alpha", "year"]).sy_class.to_dict()
+    liab = oosc.groupby(["state_alpha", "year"]).liability.sum()
+    misses, facts = known_misses(pts_cal["t1"], liab)
+    ctx = dict(metrics=Ma, metrics_before=Mb, params=params, n_train=len(train), n_val=len(val), class_of=class_of, years=years,
+               pts=pts_cal["t1"], cov_t1=cov_cal["t1"], misses=misses, facts=facts, coefs=coefs, imp=imp, ex=ex, tune=tune_tbl,
+               verdict=verdict, verdict_before=verdict_before, cal=cal, invariance=inv, bud=bud, bud_cov=bud_cov,
+               bud_cov_pooled=bud_cov_pooled, best_range=best_range, side=side, side_k=side_k,
+               rng_cov=rng_pooled.set_index("model").range_cov)
+    ctx["verdict_text"] = verdict_text(ctx)
+    write_report(ctx)
+    print(json.dumps({k: verdict[k] for k in ("chosen", "chosen_before_calibration", "reason")}, indent=2))
+    print("range method:", best_range, "| point inside range:", f"{int(bud.point_inside.sum())}/{len(bud)}")
     print("report ->", RESULTS / "validation_report.md")
 
 
