@@ -748,7 +748,7 @@ function createStateMap() {
     geo.rotateX(-Math.PI / 2); // extrusion now points up (+y), north is -z
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: NO_DATA_COLOR, roughness: 0.7 }));
     mesh.scale.y = 0.04;
-    mesh.userData = { fips: c.fips, targetH: 0.04, targetColor: new THREE.Color(NO_DATA_COLOR) };
+    mesh.userData = { fips: c.fips, state: c.state, targetH: 0.04, targetColor: new THREE.Color(NO_DATA_COLOR) };
     mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30),
       new THREE.LineBasicMaterial({ color: '#0E1318', transparent: true, opacity: 0.7 })));
     scene.add(mesh);
@@ -765,7 +765,8 @@ function createStateMap() {
   scene.add(pin);
 
   let values = new Map();
-  // Height = estimated dollar loss for the selected year and crop, scaled to the counties in scope;
+  // Only the chosen state is drawn (the other states are hidden, not just faded).
+  // Height = estimated dollar loss for the selected year and crop, scaled to that state's counties;
   // color = that year's max drought level for the crop's season. Grey and flat = no data.
   function setYear(year, crop, price, scope) {
     const i = yearIndex(year);
@@ -776,10 +777,11 @@ function createStateMap() {
       const dollars = Y.lossBu[i] == null || Y.acres[i] == null ? null : Y.lossBu[i] * Y.acres[i] * price;
       return [c.fips, { dollars, sev: Y.sev[i] }];
     }));
-    const inScope = DATA.counties.filter((c) => scope === 'ALL' || c.state === scope);
+    const inScope = DATA.counties.filter((c) => c.state === scope);
     const max = Math.max(1, ...inScope.map((c) => values.get(c.fips).dollars ?? 0));
     for (const mesh of meshes) {
       const v = values.get(mesh.userData.fips);
+      mesh.visible = mesh.userData.state === scope;
       mesh.userData.targetH = v.dollars == null ? 0.04 : 0.2 + 6 * Math.min(1, v.dollars / max);
       mesh.userData.targetColor.set(v.dollars == null ? NO_DATA_COLOR : LEVEL_COLORS[v.sev ?? 0]);
     }
@@ -793,6 +795,7 @@ function createStateMap() {
     }
     const c = centers.get(focusFips);
     const focusMesh = meshes.find((m) => m.userData.fips === focusFips);
+    pin.visible = Boolean(focusMesh?.visible);
     if (c && focusMesh) pin.position.set(c.x, focusMesh.scale.y + 1.6 + Math.sin(time * 2) * 0.25, c.z);
   }
 
@@ -808,7 +811,7 @@ const VIEWS = {
   soil:   { pos: [3.5, 0.2, 24], target: [4.5, -1.2, 0] },
 };
 
-// State view framing: back the camera off until the chosen state (or all four) fits the canvas.
+// State view framing: back the camera off until the chosen state fits the canvas.
 function stateOverview(scope = app.mapScope) {
   const box = stateMap.boxes[scope] ?? stateMap.boxes.ALL;
   const size = box.getSize(new THREE.Vector2()), center = box.getCenter(new THREE.Vector2());
@@ -854,7 +857,7 @@ const app = {
   year: DATA.startYear,
   crop: DATA.startCrop,
   prices: { ...DATA.defaultPrice },      // assumed $/bushel per crop, editable in the panel
-  mapScope: byFips.get(DATA.focusFips).state,  // 'ALL' or a state code
+  mapScope: byFips.get(DATA.focusFips).state,  // the state shown in State view
   playing: false,
   hoverFips: null,
 };
@@ -903,15 +906,15 @@ function renderHistory() {
   $('yearSlider').value = app.year;
   $('yearLabel').textContent = app.year;
   $('title').textContent = app.view === 'state'
-    ? `${app.mapScope === 'ALL' ? 'All four states' : stateName(app.mapScope)} - ${crop} - ${app.year}`
+    ? `${stateName(app.mapScope)} - ${crop} - ${app.year}`
     : `${c.name}, ${stateName(c.state)} - ${crop} - ${app.year}`;
 
   const dollars = !Y || Y.lossBu[i] == null || Y.acres[i] == null ? null : Y.lossBu[i] * Y.acres[i] * price;
   const missing = DATA.counties.filter((k) => !k.inMaster).length;
   const cropOptions = Object.keys(DATA.cropNames).map((k) =>
     `<option value="${k}" ${k === app.crop ? 'selected' : ''}>${cropName(k)}${c.crops[k] ? '' : ' (no records here)'}</option>`).join('');
-  const scopeButtons = ['ALL', ...STATE_CODES].map((code) =>
-    `<button data-scope="${code}" class="${code === app.mapScope ? 'on' : ''}">${code === 'ALL' ? 'All' : stateName(code)}</button>`).join(' ');
+  const scopeButtons = STATE_CODES.map((code) =>
+    `<button data-scope="${code}" class="${code === app.mapScope ? 'on' : ''}">${stateName(code)}</button>`).join(' ');
   const legend = app.view !== 'state' ? '' : `
     <h3>State view - ${app.year}</h3>
     <div id="scopeRow">${scopeButtons}</div>
@@ -1006,7 +1009,7 @@ function enterState() {
   if (app.mode !== 'history') return;
   if (app.view === 'state') { flyTo(stateOverview()); return; }
   const c = stateMap.centers.get(app.fips);
-  if (app.mapScope !== 'ALL') app.mapScope = byFips.get(app.fips).state;
+  app.mapScope = byFips.get(app.fips).state;
   fade(() => {
     app.view = 'state';
     placeCamera({ pos: [c.x, 6, c.z + 4.5], target: [c.x, 0, c.z] });
@@ -1241,7 +1244,15 @@ function toast(text) {
 // Camera buttons that are visible in this mode, in order (keys 1-3 follow this list).
 const visibleCams = () => [...document.querySelectorAll('[data-cam]')].filter((b) => !b.classList.contains('hidden'));
 
+// The last view the user picked (State, Aerial or Soil Cutaway) is kept for this browser tab, so it
+// survives switching county, crop or mode, and the reloads Streamlit does when page inputs change.
+// A first visit starts at State.
+const VIEW_KEY = 'droughtViewerView';
+let lastView = ['state', 'aerial', 'soil'].includes(store.get(VIEW_KEY)) ? store.get(VIEW_KEY) : 'state';
+function rememberView(name) { lastView = name; store.set(VIEW_KEY, name); }
+
 function goView(name) {
+  rememberView(name);
   if (name === 'state') { enterState(); return; }
   if (app.view === 'state') { enterCounty(app.fips, name); return; }
   flyTo(VIEWS[name]);
@@ -1303,10 +1314,11 @@ function applyMode(mode) {
   if (isHistory) {
     app.fips = sb.fips && byFips.get(sb.fips)?.inMaster ? sb.fips : app.fips;
     renderHistory();
+    if (lastView === 'state' && app.view !== 'state' && app.booted) enterState();   // back to the user's view
   } else {
     sb.fips = app.fips;
-    if (app.view === 'state') {   // the scenario lives in the diorama
-      fade(() => { app.view = 'diorama'; placeCamera(VIEWS.aerial); updateViewUI(); });
+    if (app.view === 'state') {   // the scenario lives in the diorama; State view is History only
+      fade(() => { app.view = 'diorama'; placeCamera(lastView === 'soil' ? VIEWS.soil : VIEWS.aerial); updateViewUI(); });
     }
     buildSandboxPanel();
     renderSandbox();
@@ -1344,7 +1356,7 @@ function setupUI() {
     const rect = canvas.getBoundingClientRect();
     pointer.set((e.clientX - rect.left) / rect.width * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(stateMap.meshes, false)[0];
+    const hit = raycaster.intersectObjects(stateMap.meshes.filter((m) => m.visible), false)[0];
     app.hoverFips = hit ? hit.object.userData.fips : null;
     if (!hit) { tip.classList.add('hidden'); return; }
     const c = byFips.get(app.hoverFips), v = stateMap.value(app.hoverFips);
@@ -1362,7 +1374,7 @@ function setupUI() {
     const moved = downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5;
     if (app.view === 'state' && !moved && app.hoverFips && !flight) {
       const c = byFips.get(app.hoverFips);
-      if (c.inMaster) enterCounty(app.hoverFips);
+      if (c.inMaster) { rememberView('aerial'); enterCounty(app.hoverFips); }
       else toast(`${c.name} is not in the master dataset: no data.`);
     }
   });
@@ -1431,12 +1443,24 @@ async function boot() {
   await progress('Ready');
   window.__loadMs = Math.round(performance.now() - t0);
 
-  placeCamera({ pos: [0, 48, 40], target: [0, 0, 0] });
+  // Open on the user's last view (State on a first visit). Scenario mode has no State view.
+  let opening;
+  if (lastView === 'state' && app.mode === 'history') {
+    app.view = 'state';
+    app.mapScope = byFips.get(app.fips).state;
+    updateViewUI();
+    opening = stateOverview();
+    placeCamera({ pos: [opening.target[0], opening.pos[1] * 1.6, opening.target[2] + opening.pos[2] * 0.4], target: opening.target });
+  } else {
+    placeCamera({ pos: [0, 48, 40], target: [0, 0, 0] });
+    opening = lastView === 'soil' ? VIEWS.soil : VIEWS.aerial;
+  }
   $('loading').style.opacity = 0;
   setTimeout(() => $('loading').classList.add('hidden'), 500);
   clock.start();
   requestAnimationFrame(loop);
-  flyTo(VIEWS.aerial, 1.6);
+  flyTo(opening, 1.6);
+  app.booted = true;
 }
 
 boot().catch((err) => {

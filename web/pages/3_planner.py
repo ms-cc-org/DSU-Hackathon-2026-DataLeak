@@ -1,17 +1,15 @@
-"""Planner: step 1 estimates crop-value loss for a county scenario; step 2 splits a fund across counties.
+"""Planner: estimates crop-value loss for one county under a chosen drought scenario.
 
-Step 1 uses web/scenario_lookup.py (a prototype lookup, not a validated model) because src/engine.py
-has no scenario function yet. Step 2 uses src/allocation.py's allocation function when it exists;
-until then it shows its controls and a "Not available yet" state, and no amounts are invented.
+Uses web/scenario_lookup.py (a prototype lookup, not a validated model), the same method and numbers as
+the 3D viewer's Scenario mode.
 """
 
 import pandas as pd
 import streamlit as st
 
-import src.allocation as allocation
 from web.render3d import CROPS, DEFAULT_FIPS, LAST_YEAR, LAST_PROJECTED_YEAR, STATES, loadCountyHistory
 from web.scenario_lookup import LEVELS, countyRecords, scenario
-from web.ui import AMBER, CROP_NAMES, DEFAULT_PRICE, DROUGHT_COLORS, eyebrow, markdownSafe, money, showPending
+from web.ui import CROP_NAMES, DEFAULT_PRICE, DROUGHT_COLORS, eyebrow, markdownSafe, money
 
 
 PAGE_CSS = """
@@ -25,10 +23,6 @@ PAGE_CSS = """
 @media (min-width: 900px) { .st-key-cardInputs { max-width: 460px; } }
 </style>
 """
-
-ALLOCATION_RULES = ["Proportional to expected loss", "Equal split", "Trigger only", "Tiered"]
-TRIGGERS = ["Weeks in D2+", "Expected loss above a threshold"]
-
 
 @st.cache_data(show_spinner=False)
 def countyOptions() -> pd.DataFrame:
@@ -54,12 +48,11 @@ def probabilityBars(probs: list[float]) -> None:
 
 st.html(PAGE_CSS)
 eyebrow("PLANNER")
-st.title("Test a drought, then split the fund.")
-st.write("Step one estimates crop-value loss for a county. Step two turns expected losses into a county-by-county "
-         "allocation. Neither is a weather forecast or an official payment.")
+st.title("Test a drought on a county.")
+st.write("Estimate the crop-value loss for one county under a drought level you choose, or the most likely level "
+         "from 2000-2025 history. It is not a weather forecast or an official payment.")
 
-# --- Step 1: scenario ------------------------------------------------------------------------
-st.subheader("Step 1 · Scenario")
+st.subheader("Scenario")
 inputsColumn, outputsColumn = st.columns([5, 7], gap="medium")
 with inputsColumn:
     with st.container(key="cardInputs"):
@@ -112,42 +105,3 @@ with outputsColumn:
                 f"{result['acres'] or 0:,.0f} planted acres (latest reported) x ${price:.2f}/bu (assumed)."))
         st.caption("Model estimate from 2000-2025 history, not a weather forecast. If an input falls outside the "
                    "county's history, a warning replaces the confident number. Prototype lookup, not a validated model.")
-
-# --- Step 2: budget allocation ------------------------------------------------------------------
-st.subheader("Step 2 · Budget allocation")
-with st.container(key="cardAllocation"):
-    fundColumn, ruleColumn, triggerColumn, shareColumn = st.columns(4)
-    fund = fundColumn.number_input("Fund size ($)", min_value=0, value=10_000_000, step=500_000)
-    rule = ruleColumn.selectbox("Rule", ALLOCATION_RULES)
-    trigger = triggerColumn.selectbox("Trigger", TRIGGERS)
-    minimumShare = shareColumn.slider("Minimum share per county", 0.0, 0.05, 0.0, step=0.005, format="%.3f",
-                                      help="Smallest share of the fund any eligible county receives.")
-
-    allocate = getattr(allocation, "allocate", None)
-    if not callable(allocate):
-        showPending("County allocation (src/allocation.py has no allocation function yet)")
-    else:
-        # Interface agreed in the team to-do list: a table of expected losses in, a table of amounts and reasons out.
-        state = countyRecords(fips, crop).get("state")
-        stateCounties = counties[counties["state_alpha"] == state]
-        losses = []
-        for row in stateCounties.itertuples():
-            r = scenario(row.fips, crop, year, level, price)
-            if "error" not in r and r["acres"] is not None:
-                losses.append({"fips": row.fips, "county": row.county_name, "expected_loss": r["dollars"](r["mid"])})
-        try:
-            table = pd.DataFrame(allocate(pd.DataFrame(losses), fund, rule, trigger, minimumShare))
-            amount = table["amount"].fillna(0)
-            loss = table["expected_loss"].fillna(0)
-            hardest = loss >= loss.quantile(0.75)
-            chips = st.columns(4)
-            chips[0].metric("Loss covered", f"{100 * amount.clip(upper=loss).sum() / max(loss.sum(), 1):.0f}%")
-            chips[1].metric("Fund to hardest-hit counties", f"{100 * amount[hardest].sum() / max(amount.sum(), 1):.0f}%")
-            chips[2].metric("Counties left with nothing", int((amount <= 0).sum()))
-            chips[3].metric("Remaining gap", money(max(loss.sum() - amount.sum(), 0)))
-            shown = table.rename(columns={"county": "County", "expected_loss": "Expected loss", "amount": "Amount", "reason": "Reason"})
-            st.dataframe(shown[["County", "Expected loss", "Amount", "Reason"]], hide_index=True, width="stretch")
-            st.download_button("Download CSV", shown.to_csv(index=False), file_name="allocation.csv", mime="text/csv")
-        except Exception as error:
-            st.error(f"The allocation function could not be used: {error}")
-    st.caption("Dollar figures are estimated crop-value loss, not insurance claims or official relief payments.")

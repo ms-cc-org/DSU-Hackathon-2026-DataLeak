@@ -21,13 +21,13 @@ The app opens at http://localhost:8501. No API keys and no network are needed at
 
 ### Tabs
 
-The app has four tabs in a top bar.
+The app has four tabs in a top bar and no sidebar.
 
 | Tab | What it shows | Where the numbers come from |
 |---|---|---|
-| **Story** | A dusk landscape hero (drawn in code), count-up dataset stats, three numbered chapters on the method beside an animated 2000-2025 drought map of all 253 counties (pinned while the chapters scroll), and an evidence band | Dataset counts and weekly Drought Monitor maps; the evidence cards show "Not validated yet" until results are saved in `analysis/validation/results/` and `docs/coverage.csv` |
-| **Explore 3D** | The 3D viewer inline: a county diorama with a year card (Play, one drought-colored bar per year, a slider aligned under the bars), an extruded map of all four states, a side panel with History and Scenario modes; below it, counties ranked by expected annual loss with "Open in 3D" buttons and yearly charts | History: the 2000-2025 records. Scenario: the prototype lookup |
-| **Planner** | Step 1: a county scenario for 2026-2030 (drought level D0-D4 or Predict) with a dollar range, loss %, level probabilities and the closest past years. Step 2: allocation controls | Step 1: prototype lookup (`web/scenario_lookup.py`), not a validated model. Step 2: shows "Not available yet" until `src/allocation.py` has an allocation function |
+| **Story** | A dusk landscape hero (drawn in code), count-up dataset stats, three numbered chapters on the method beside an animated 2000-2025 drought map, one state at a time (pinned while the chapters scroll), and an evidence band | Dataset counts and weekly Drought Monitor maps; the evidence cards show "Not validated yet" until results are saved in `analysis/validation/results/` and `docs/coverage.csv` |
+| **Explore 3D** | The 3D viewer inline, opening at State view: an extruded map of one state at a time (the other states are hidden), a county diorama with a year card (Play, one drought-colored bar per year, a slider aligned under the bars), and a side panel with History and Scenario modes. The camera view you last picked is kept when you switch county, crop or mode; below it, counties ranked by expected annual loss with "Open in 3D" buttons and yearly charts | History: the 2000-2025 records. Scenario: the prototype lookup |
+| **Planner** | A county scenario for 2026-2030 (drought level D0-D4 or Predict) with a dollar range, loss %, level probabilities and the closest past years | Prototype lookup (`web/scenario_lookup.py`), not a validated model |
 | **Evidence** | Filters, definitions, coverage, backtest results when saved, limits, then the credits | Records and saved results |
 
 `web/pages/3_scenarios.py`, `4_budget_allocation.py` and `6_credits.py` stay on disk for teammates but are not registered as tabs.

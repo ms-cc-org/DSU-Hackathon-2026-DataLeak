@@ -57,13 +57,12 @@ def chapter(number: str, headline: str, copy: str) -> None:
 
 def droughtMap() -> None:
     """The animated 2000-2025 drought map with its state switch (real weekly Drought Monitor data)."""
-    scopeNames = {"ALL": "All four", **STATES}
-    scope = st.segmented_control("State", list(scopeNames), default="IA", format_func=scopeNames.get,
+    scope = st.segmented_control("State", list(STATES), default="IA", format_func=STATES.get,
                                  key="storyScope") or "IA"
     drought = growingSeasonDrought()
     geo = load_counties()
     features = [f for f in geo["features"] if f["properties"]["state_alpha"] in STATES
-                and (scope == "ALL" or f["properties"]["state_alpha"] == scope)]
+                and f["properties"]["state_alpha"] == scope]
     names = {f["id"]: f"{f['properties']['county_name']}, {f['properties']['state_alpha']}" for f in features}
     shown = drought[drought["fips"].isin(names)].copy()
     shown["county"] = shown["fips"].map(names)

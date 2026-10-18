@@ -15,7 +15,6 @@ st.set_page_config(
     page_title="Drought Relief Planner",
     page_icon=":material/agriculture:",
     layout="wide",
-    initial_sidebar_state="collapsed",
 )
 
 currentPage = st.navigation(
@@ -32,8 +31,4 @@ brand = Path(__file__).resolve().parent / "web" / "assets" / "brand.svg"
 if brand.exists():
     st.logo(str(brand), size="large")
 applyStyle()  # shared tokens and motion for every page (style only; takes no space)
-st.sidebar.caption(
-    "Drought Relief Planner · four states, four crops, 2000-2025 records · August 15 decision. "
-    "Dollar values are estimated crop-value loss, not relief payments."
-)
 currentPage.run()

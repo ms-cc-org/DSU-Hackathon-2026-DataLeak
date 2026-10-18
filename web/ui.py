@@ -87,6 +87,9 @@ GLOBAL_CSS = f"""
 @keyframes drShine {{ from {{ background-position: 0% 50%; }} to {{ background-position: 200% 50%; }} }}
 @keyframes drGlow {{ 0%, 100% {{ box-shadow: 0 0 0 0 rgba(242,163,58,0); }} 50% {{ box-shadow: 0 0 0 6px rgba(242,163,58,.22); }} }}
 
+/* No sidebar: navigation lives in the top bar */
+[data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] {{ display: none !important; }}
+
 /* Top bar: brand on the left, pill tabs, a small mono decision label on the right */
 [data-testid="stHeader"] {{ background: var(--ground); border-bottom: 1px solid var(--line); }}
 [data-testid="stHeaderLogo"] {{ height: 34px; width: 34px; }}

@@ -38,16 +38,9 @@ Branch: `lane-4-app`. Files owned: `app.py`, `web/render3d.py`, `web/ui.py`, `we
 
 ## Handoffs
 
-- **Lane 3:** the Scenarios and Budget allocation pages are superseded by the **Planner** tab (`web/pages/3_planner.py`).
-  Your files stay on disk, unregistered, so nothing you wrote is lost. Step 2 of the Planner calls
-  `src/allocation.py: allocate(losses, fund, rule, trigger, minimum_share)` as soon as it exists, following the
-  interface in the team to-do list:
-  - Input: a DataFrame with `fips`, `county`, `expected_loss`.
-  - Output: a table with `county`, `expected_loss`, `amount`, `reason`.
-
-  Until then it shows "Not available yet" and no amounts. The rule and trigger labels it passes are
-  "Proportional to expected loss", "Equal split", "Trigger only", "Tiered", "Weeks in D2+" and
-  "Expected loss above a threshold".
+- **Lane 3:** the Scenarios and Budget allocation pages are not registered as tabs; their files stay on disk, so
+  nothing you wrote is lost. Budget allocation was removed from the Planner tab at the team lead's request, so no tab
+  calls `src/allocation.py` now.
 - **Lane 2 (engine):** the Planner and the viewer's Scenario mode use one prototype lookup, `web/scenario_lookup.py`
   (Python) and `runEngine` in the viewer (JavaScript). Both read the same county records, so they show identical numbers:
   - It takes past years whose Aug 15 drought level matches the input, and reports their median loss and min-max range.
@@ -74,6 +67,8 @@ What changed:
 - **Story:**
   - The dusk hero is drawn in SVG inside its own frame. The two CTAs are real `st.page_link`s pulled up over the hero.
   - Below it: the stats row, three chapters, the drought map, the evidence band and the footer.
+  - Chapter 03 ("Split a fixed fund on August 15") still describes fund size, rules and triggers, which the app no longer
+    offers since budget allocation was removed. Reword it if allocation will not come back.
   - **The sticky pin worked:** the map column stays in view while the chapters scroll (checked at 1440x900). It only
     applies at 900px and wider; on phones the columns stack.
 - **Explore 3D:**
@@ -81,8 +76,20 @@ What changed:
   - The slider is sized so its thumb sits under each bar's center. Measured offsets were 0.0px at 1440 and at 390 wide.
   - Play now stops at 2025 instead of looping.
   - The old Visualize button is gone. A card's "Open in 3D" button loads that county into the viewer.
-- **Planner:** step 1 uses `web/scenario_lookup.py`; step 2 is pending (see Handoffs).
+- **Planner:** the county scenario only, from `web/scenario_lookup.py`. Budget allocation was removed.
 - **Evidence:** the Method and data content, then the credits (`web/credits.py`).
+
+Follow-up changes:
+
+- **One state at a time:** the "All four" option is gone from the 3D State view and from the Story map. In State view only
+  the chosen state's counties are drawn and can be hovered; the other states are hidden, not faded.
+- **No sidebar:** `app.py` no longer writes to the sidebar, and `web/ui.py` hides the sidebar and its toggle.
+- **Opening view and memory:** the viewer opens at State view on a first visit. The last view the user picks (State,
+  Aerial or Soil Cutaway, by button, key 1-3, or by clicking a county on the map) is stored in the browser tab's
+  sessionStorage (`droughtViewerView`). It survives switching county, crop or mode, and the reloads Streamlit does when
+  page inputs change. Scenario mode has no State view, so it shows Aerial (or Soil Cutaway) and returns to State when
+  you switch back to History.
+- **Planner:** budget allocation removed; the page is the county scenario only.
 
 Things to know:
 
