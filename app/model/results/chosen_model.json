@@ -1,0 +1,15 @@
+{
+  "chosen": "B",
+  "reason": "near-best on both metrics (capture within 0.02, WAPE within 5% of best); simplest of ['B']",
+  "beats_B1_outside_noise": true,
+  "params": {
+    "B": {
+      "max_iter": 200,
+      "max_depth": 4
+    },
+    "C": {
+      "k": 10,
+      "drought_weight": 1.0
+    }
+  }
+}
