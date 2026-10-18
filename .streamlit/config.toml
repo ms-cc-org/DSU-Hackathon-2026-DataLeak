@@ -1,0 +1,7 @@
+# Dark theme that matches the 3D viewer. Only presentation settings live here.
+[theme]
+base = "dark"
+primaryColor = "#f0b429"
+backgroundColor = "#0d1117"
+secondaryBackgroundColor = "#151c26"
+textColor = "#e8ecf1"

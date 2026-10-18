@@ -1,11 +1,17 @@
-"""Streamlit entry point and navigation for the drought relief planner."""
+"""Streamlit entry point: navigation and the shared sidebar.
+
+Run from the repository root:
+    python -m streamlit run app.py
+"""
 
 import streamlit as st
+
+from web.ui import applyStyle
 
 
 st.set_page_config(
     page_title="Drought Relief Allocation Planner",
-    page_icon="🌽",
+    page_icon=":material/agriculture:",
     layout="wide",
 )
 
@@ -20,5 +26,8 @@ currentPage = st.navigation(
     ]
 )
 
-st.sidebar.caption("Iowa corn · August 15 decision · scaffold")
+applyStyle()  # shared theme motion for every page (style only; takes no space)
+st.sidebar.caption(
+    "California · Delaware · Iowa · Nebraska · August 15 decision. Dollar values are an estimated crop loss, not program payout."
+)
 currentPage.run()

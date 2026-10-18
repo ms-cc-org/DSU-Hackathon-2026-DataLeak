@@ -13,6 +13,10 @@ test.py
 suggestions.md
 .vscode
 .ipynb_checkpoints/
+# Secrets: any .env variant except the documented template
+.env.*
+!.env.example
+.streamlit/secrets.toml
 # model data: testing/ is the held-out set and must never be committed
 usda_budget_data/testing/
 app/usda_budget_data/
