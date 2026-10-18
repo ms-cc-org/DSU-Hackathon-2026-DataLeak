@@ -1,4 +1,4 @@
-"""Credits content (data sources, software, animation and media, AI use), shown on the Evidence tab."""
+"""Credits content (data sources, software, animation and media, AI use), retained for the unregistered credits page."""
 
 import streamlit as st
 
@@ -26,7 +26,7 @@ All data is public federal data, supplied in the starter repository.
 - **Satellite/aerial basemap:** U.S. Geological Survey imagery tiles from The National Map. Imagery is geographic
   context and needs internet access; the county outline view uses local boundaries.
 - **Insurance:** USDA RMA-derived historical inputs and outcomes in the repository; model D predicts payout and
-  damaged-acre shares. Its held-out results and limitations are shown on Evidence.
+  damaged-acre shares. Its held-out results and limitations are documented in app/model/results/.
 - **Crop prices:** the app uses editable assumed prices (corn \\$4.00/bu, soybeans \\$10.00/bu, winter wheat
   \\$5.50/bu, sorghum \\$4.00/bu) until a cited price source is added.
 """
@@ -54,7 +54,7 @@ All data is public federal data, supplied in the starter repository.
     st.subheader("AI use")
     st.markdown(
         f"""
-- **Claude Code (Anthropic):** helped write the 3D viewer, the Story, Explore 3D, Planner and Evidence tabs, the
+- **Claude Code (Anthropic):** helped write the 3D viewer, the Story, Explore 3D, Planner and original method pages, the
   prototype scenario lookup (`web/scenario_lookup.py`), the theme, and the README. Verified by running every page,
   checking numbers against the master table (for example Mahaska County corn 2012: 133.0 bu/acre, 25.0% below
   trend, D3), and a clean-clone test.

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Predicted insurance payouts · 3D county map</title>
+<script type="importmap">__IMPORT_MAP__</script>
+<style>
+  :root { color-scheme: dark; --ground:#0E1318; --panel:#151C23; --line:#26313B; --text:#E8E4DA; --muted:#B9C0C7; --amber:#F2A33A; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ground); color:var(--text); font:14px/1.5 system-ui,sans-serif; }
+  main { display:grid; grid-template-columns:minmax(0,1fr) 275px; gap:12px; height:645px; }
+  #stage { position:relative; min-width:0; overflow:hidden; border:1px solid var(--line); border-radius:22px; }
+  canvas { display:block; touch-action:none; }
+  #toolbar { position:absolute; top:12px; left:12px; display:flex; gap:6px; z-index:2; }
+  button, select { font:inherit; color:var(--text); background:var(--ground); border:1px solid var(--line); border-radius:18px; padding:8px 13px; min-height:38px; }
+  button { cursor:pointer; }
+  button:hover { border-color:var(--amber); }
+  :focus-visible { outline:2px solid var(--amber); outline-offset:3px; }
+  #legend { position:absolute; bottom:14px; left:16px; right:16px; pointer-events:none; font-size:12px; }
+  #ramp { height:6px; max-width:230px; margin-bottom:5px; border-radius:4px; background:linear-gradient(90deg,#826035,#F2A33A); }
+  #legendLabels { display:flex; justify-content:space-between; max-width:230px; font-variant-numeric:tabular-nums; }
+  #tooltip { position:absolute; padding:8px 12px; background:var(--panel); border:1px solid var(--line); border-radius:12px; pointer-events:none; z-index:3; }
+  [hidden] { display:none!important; }
+  aside { background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:18px; overflow:auto; }
+  h1 { margin:0 0 4px; font-size:19px; line-height:1.3; }
+  h2 { margin:24px 0 8px; font-size:17px; }
+  p { margin:6px 0 12px; }
+  .muted { color:var(--muted); font-size:12px; }
+  select { width:100%; margin:8px 0; border-radius:12px; }
+  .amount { color:var(--amber); font:600 clamp(23px,2.2vw,30px)/1.3 ui-monospace,monospace; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+  dl { margin:16px 0; }
+  dl div { border-top:1px solid var(--line); padding:9px 0; }
+  dt { color:var(--muted); font-size:12px; }
+  dd { margin:2px 0 0; font-variant-numeric:tabular-nums; }
+  #status { position:absolute; top:50%; left:12px; right:12px; text-align:center; }
+  @media(max-width:720px) { main { grid-template-columns:1fr; grid-template-rows:370px 260px; gap:10px; } aside { padding:12px 16px; } h2 { margin-top:12px; } }
+</style>
+</head>
+<body>
+<main>
+  <section id="stage" aria-label="Interactive 3D county insurance payout map">
+    <div id="toolbar"><button id="stateView">State view</button><button id="aerialView">Aerial</button></div>
+    <div id="status" role="status">Building county predictions…</div>
+    <div id="tooltip" hidden></div>
+    <div id="legend"><div id="ramp"></div><div id="legendLabels"><span>$0</span><span id="maximum"></span></div><div>Grey = no estimate · heights scaled within this run</div></div>
+  </section>
+  <aside aria-label="County prediction details">
+    <h1 id="stateTitle"></h1><p class="muted" id="scope"></p>
+    <label for="countySelect">Inspect a county</label><select id="countySelect"></select>
+    <div id="countyDetail" aria-live="polite"></div>
+  </aside>
+</main>
+<script id="predictionData" type="application/json">__DATA_JSON__</script>
+<script>
+  setTimeout(() => {
+    if (!window.insuranceMapReady) document.getElementById('status').textContent =
+      'The 3D map could not start. Enable WebGL / hardware acceleration. Predictions remain available in the table below.';
+  }, 15000);
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const data = JSON.parse(document.getElementById('predictionData').textContent);
+const getElement = (id) => document.getElementById(id);
+const money = (value) => value == null ? 'No estimate' : new Intl.NumberFormat('en-US', { style:'currency', currency:'USD', maximumFractionDigits:0 }).format(value);
+const percent = (value) => value == null ? 'No estimate' : new Intl.NumberFormat('en-US', { style:'percent', minimumFractionDigits:2, maximumFractionDigits:2 }).format(value);
+const escapeText = (value) => String(value).replace(/[&<>"']/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
+const stage = getElement('stage');
+getElement('stateTitle').textContent = `${data.state} · ${data.year}`;
+getElement('scope').textContent = `${data.counties.length} counties · ${data.cropLabel}`;
+const countySelect = getElement('countySelect');
+for (const county of [...data.counties].sort((first, second) => first.name.localeCompare(second.name))) {
+  countySelect.add(new Option(county.name, county.fips));
+}
+const maxPayout = Math.max(0, ...data.counties.map((county) => county.payoutUsd ?? 0));
+getElement('maximum').textContent = money(maxPayout);
+const meshes = [];
+let selectedFips = null;
+
+function selectCounty(fips) {
+  selectedFips = fips;
+  countySelect.value = fips;
+  const county = data.counties.find((candidate) => candidate.fips === fips);
+  getElement('countyDetail').innerHTML = `<h2>${escapeText(county.name)}</h2><p class="muted">Predicted insurance payouts</p>
+    <div class="amount">${money(county.payoutUsd)}</div>` + (county.payoutUsd == null
+      ? '<p>No insured prediction for the selected crops in this run. This is not a zero payout.</p>'
+      : `<dl><div><dt>Predicted payout share</dt><dd>${percent(county.payoutShare)}</dd></div>
+          <div><dt>Predicted damaged-acre share</dt><dd>${percent(county.damagedAcreShare)}</dd></div>
+          ${county.crops.map((crop) => `<div><dt>${escapeText(crop.name)} payout</dt><dd>${money(crop.payoutUsd)}</dd></div>`).join('')}</dl>
+          <p class="muted">${county.outOfRange ? 'Some inputs are outside the training range. See the input breakdown.' : 'Shares use insured exposure weights across the included crops.'}</p>`) +
+    `<p class="muted">County FIPS ${escapeText(fips)} · ${county.crops.length} included crop records</p>`;
+  for (const mesh of meshes) mesh.material.emissive.set(mesh.userData.fips === fips ? '#453015' : '#000000');
+}
+countySelect.addEventListener('change', () => selectCounty(countySelect.value));
+const highestCounty = [...data.counties].sort((first, second) => (second.payoutUsd ?? -1) - (first.payoutUsd ?? -1))[0];
+selectCounty(highestCounty.fips);
+
+try {
+  const renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  stage.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color('#11171D');
+  scene.add(new THREE.HemisphereLight('#dfe8f2', '#3a3a3a', 1.3));
+  const sunlight = new THREE.DirectionalLight('#fff4e2', 2.2);
+  sunlight.position.set(-40, 90, 60);
+  scene.add(sunlight);
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.screenSpacePanning = true;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 10;
+  controls.maxDistance = 260;
+  const coordinates = data.counties.flatMap((county) => county.rings.flat());
+  const longitudes = coordinates.map((point) => point[0]);
+  const latitudes = coordinates.map((point) => point[1]);
+  const lonCenter = (Math.min(...longitudes) + Math.max(...longitudes)) / 2;
+  const latCenter = (Math.min(...latitudes) + Math.max(...latitudes)) / 2;
+  const longitudeScale = Math.cos(latCenter * Math.PI / 180);
+  const mapScale = 50 / ((Math.max(...longitudes) - Math.min(...longitudes)) * longitudeScale);
+  const mapHeight = (Math.max(...latitudes) - Math.min(...latitudes)) * mapScale;
+  const project = ([longitude, latitude]) => new THREE.Vector2((longitude - lonCenter) * longitudeScale * mapScale, (latitude - latCenter) * mapScale);
+  const lowColor = new THREE.Color('#826035');
+  const highColor = new THREE.Color('#F2A33A');
+  for (const county of data.counties) {
+    const shapes = county.rings.map((ring) => new THREE.Shape(ring.map(project)));
+    const geometry = new THREE.ExtrudeGeometry(shapes, { depth:1, bevelEnabled:false });
+    geometry.rotateX(-Math.PI / 2);
+    const ratio = maxPayout > 0 ? (county.payoutUsd ?? 0) / maxPayout : 0;
+    const material = new THREE.MeshStandardMaterial({ color:county.payoutUsd == null ? '#39434C' : lowColor.clone().lerp(highColor, ratio), roughness:0.7 });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.scale.y = 0.08;
+    mesh.userData = { fips:county.fips, targetHeight:county.payoutUsd == null ? 0.08 : 0.18 + 6 * ratio };
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 30), new THREE.LineBasicMaterial({ color:'#0E1318', transparent:true, opacity:0.8 })));
+    meshes.push(mesh);
+    scene.add(mesh);
+  }
+  selectCounty(selectedFips);
+  let activeView = 'state';
+  function frameMap(view = activeView) {
+    activeView = view;
+    const verticalHalf = THREE.MathUtils.degToRad(camera.fov / 2);
+    const horizontalHalf = Math.atan(Math.tan(verticalHalf) * camera.aspect);
+    const distance = 1.18 * Math.max(27 / Math.tan(horizontalHalf), (mapHeight / 2 + 8) / Math.tan(verticalHalf));
+    const tilt = THREE.MathUtils.degToRad(view === 'aerial' ? 89 : 55);
+    camera.position.set(0, distance * Math.sin(tilt), distance * Math.cos(tilt));
+    controls.target.set(0, 2, 0);
+    controls.update();
+  }
+  function resizeMap() {
+    renderer.setSize(stage.clientWidth, stage.clientHeight);
+    camera.aspect = stage.clientWidth / stage.clientHeight;
+    camera.updateProjectionMatrix();
+    frameMap();
+  }
+  new ResizeObserver(resizeMap).observe(stage);
+  getElement('stateView').addEventListener('click', () => frameMap('state'));
+  getElement('aerialView').addEventListener('click', () => frameMap('aerial'));
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const tooltip = getElement('tooltip');
+  let downPoint = null;
+  function countyAt(event) {
+    const bounds = renderer.domElement.getBoundingClientRect();
+    pointer.set((event.clientX - bounds.left) / bounds.width * 2 - 1, 1 - (event.clientY - bounds.top) / bounds.height * 2);
+    raycaster.setFromCamera(pointer, camera);
+    return raycaster.intersectObjects(meshes, false)[0]?.object.userData.fips;
+  }
+  renderer.domElement.addEventListener('pointerdown', (event) => { downPoint = [event.clientX, event.clientY]; });
+  renderer.domElement.addEventListener('pointermove', (event) => {
+    const fips = countyAt(event);
+    tooltip.hidden = !fips || event.buttons > 0;
+    renderer.domElement.style.cursor = fips ? 'pointer' : 'grab';
+    if (!fips) return;
+    const county = data.counties.find((candidate) => candidate.fips === fips);
+    tooltip.textContent = `${county.name} · ${money(county.payoutUsd)}`;
+    const bounds = stage.getBoundingClientRect();
+    tooltip.style.left = `${Math.max(8, Math.min(event.clientX - bounds.left + 12, bounds.width - tooltip.offsetWidth - 8))}px`;
+    tooltip.style.top = `${Math.max(8, Math.min(event.clientY - bounds.top + 12, bounds.height - tooltip.offsetHeight - 8))}px`;
+  });
+  renderer.domElement.addEventListener('pointerleave', () => { tooltip.hidden = true; });
+  renderer.domElement.addEventListener('pointerup', (event) => {
+    if (!downPoint || Math.hypot(event.clientX - downPoint[0], event.clientY - downPoint[1]) > 5) return;
+    const fips = countyAt(event);
+    if (fips) selectCounty(fips);
+  });
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clock = new THREE.Clock();
+  renderer.setAnimationLoop(() => {
+    const delta = Math.min(clock.getDelta(), 0.1);
+    for (const mesh of meshes) mesh.scale.y = THREE.MathUtils.lerp(mesh.scale.y, mesh.userData.targetHeight, reducedMotion ? 1 : 1 - Math.exp(-delta / 0.18));
+    controls.update();
+    renderer.render(scene, camera);
+  });
+  resizeMap();
+  getElement('status').hidden = true;
+  window.insuranceMapReady = true;
+} catch (error) {
+  getElement('status').textContent = 'The 3D map needs WebGL / hardware acceleration. Predictions remain available in the table below.';
+  console.error(error);
+}
+</script>
+</body>
+</html>

@@ -90,22 +90,20 @@ GLOBAL_CSS = f"""
 /* No sidebar: navigation lives in the top bar */
 [data-testid="stSidebar"], [data-testid="stSidebarCollapsedControl"], [data-testid="stExpandSidebarButton"] {{ display: none !important; }}
 
-/* Top bar: brand on the left, pill tabs, a small mono decision label on the right */
+/* Top bar: brand on the left and page tabs */
 [data-testid="stHeader"] {{ background: var(--ground); border-bottom: 1px solid var(--line); }}
 [data-testid="stHeaderLogo"] {{ height: 34px; width: 34px; }}
 div:has(> [data-testid="stHeaderLogo"]), a:has(> [data-testid="stHeaderLogo"]), button:has(> [data-testid="stHeaderLogo"]) {{ display: flex; align-items: center; gap: 10px; text-decoration: none; }}
 div:has(> [data-testid="stHeaderLogo"])::after, a:has(> [data-testid="stHeaderLogo"])::after,
 button:has(> [data-testid="stHeaderLogo"])::after {{ content: "Drought Relief Planner"; font-family: var(--display);
   font-weight: 700; font-size: 1.05rem; color: var(--text); white-space: nowrap; }}
-[data-testid="stToolbarActions"]::before {{ content: "4 states · 4 crops · Aug 15 decision"; font-family: var(--mono);
-  font-size: .72rem; letter-spacing: .06em; color: var(--muted); margin-right: 12px; align-self: center; white-space: nowrap; }}
 [data-testid="stTopNavLink"] {{ border-radius: 999px; border: 1px solid var(--line); min-height: 44px; padding: 0 18px;
   display: inline-flex; align-items: center; transition: background .2s ease, color .2s ease; }}
 [data-testid="stTopNavLink"] p {{ font-weight: 500; }}
 [data-testid="stTopNavLink"]:hover {{ border-color: var(--amber); }}
 [data-testid="stTopNavLink"][aria-current="page"] {{ background: var(--amber); border-color: var(--amber); }}
 [data-testid="stTopNavLink"][aria-current="page"] p {{ color: var(--ground); font-weight: 700; }}
-@media (max-width: 760px) {{ [data-testid="stToolbarActions"]::before, div:has(> [data-testid="stHeaderLogo"])::after,
+@media (max-width: 760px) {{ div:has(> [data-testid="stHeaderLogo"])::after,
   a:has(> [data-testid="stHeaderLogo"])::after, button:has(> [data-testid="stHeaderLogo"])::after {{ display: none; }} }}
 
 /* Page */

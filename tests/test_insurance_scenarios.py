@@ -10,9 +10,56 @@ from src.engine import _loadArtifact, _loadScenarioInputs, scenario
 from src.insurance_scenarios import (exposureRows, historicalInsuranceScenario, insuranceAnalogContext,
                                       projectInsurance, replayInsurance, substituteClimate)
 from web.insurance_ui import exportTable
+from web.insurance_data import runInsurance
 
 
 class InsuranceScenarioTests(unittest.TestCase):
+    def testSelectedCropOutputsMatchFrozenModelsAndDollarFormulasInEveryMode(self) -> None:
+        moneyColumns = ["X_payout_usd", "Y_deductible_exposure_usd", "Z_relief_95pct_usd"]
+        predictionColumns = ["pred_payout_share", "pred_damaged_acre_share", *moneyColumns, "predDamagedAcres"]
+        for mode in ("Future insurance scenario", "Historical footprint scenario", "Historical replay"):
+            for state in ("IA", "NE"):
+                for crop in ("ALL", "CORN", "SOYBEANS"):
+                    with self.subTest(mode=mode, state=state, crop=crop):
+                        inputs = {"mode": mode, "state": state, "crop": crop,
+                                  "year": 2026 if mode == "Future insurance scenario" else 2023,
+                                  "baseYear": 2025 if mode == "Future insurance scenario" else 2023,
+                                  "footprint": "ALL" if mode == "Future insurance scenario" else 2012,
+                                  "acresScale": 1.7, "priceScale": 1.3}
+                        result = runInsurance(inputs)
+                        selectedCrops = {"CORN", "SOYBEANS"} if crop == "ALL" else {crop}
+                        self.assertEqual(set(result["countyTable"]["crop"]), selectedCrops)
+                        self.assertEqual(set(result["modelInputs"]["crop"]), selectedCrops)
+                        self.assertEqual(set(result["metadata"]["crops"]), selectedCrops)
+                        self.assertEqual(result["metadata"]["selection"], inputs)
+                        modelName = "test" if mode == "Historical replay" else "full"
+                        models = _loadArtifact(modelName)["d_models"]
+                        acresScale = 1.0 if mode == "Historical replay" else inputs["acresScale"]
+                        priceScale = 1.0 if mode == "Historical replay" else inputs["priceScale"]
+                        dollarScale = acresScale * priceScale
+                        expectedDraws = []
+                        for footprintYear, rows in result["modelInputs"].groupby("footprintYear"):
+                            expected = rows[["fips", "crop"]].copy()
+                            payoutShares = models["drought_payout_share"].predict(rows)
+                            damagedShares = models["drought_loss_acre_share"].predict(rows)
+                            expected["pred_payout_share"] = payoutShares
+                            expected["pred_damaged_acre_share"] = damagedShares
+                            expected["X_payout_usd"] = payoutShares * rows["liability"].to_numpy() * dollarScale
+                            expected["Y_deductible_exposure_usd"] = damagedShares * rows["full_crop_value"].to_numpy() * (1 - rows["avg_coverage"].to_numpy()) * dollarScale
+                            expected["Z_relief_95pct_usd"] = damagedShares * rows["full_crop_value"].to_numpy() * np.maximum(0, 0.95 - rows["avg_coverage"].to_numpy()) * dollarScale
+                            expected["predDamagedAcres"] = damagedShares * rows["insured_acres"].to_numpy() * acresScale
+                            expectedDraws.append(expected)
+                        expectedTable = pd.concat(expectedDraws).groupby(["fips", "crop"])[predictionColumns].mean()
+                        actualTable = result["countyTable"].set_index(["fips", "crop"])[predictionColumns].sort_index()
+                        np.testing.assert_allclose(actualTable, expectedTable, rtol=1e-11, atol=1e-7)
+                        for columnName in moneyColumns:
+                            self.assertAlmostEqual(result["totals"][columnName], expectedTable[columnName].sum(), places=5)
+                        self.assertAlmostEqual(result["totals"]["payoutShare"], expectedTable["X_payout_usd"].sum() / result["countyTable"]["scenarioLiabilityUsd"].sum())
+                        self.assertAlmostEqual(result["totals"]["damagedAcreShare"], expectedTable["predDamagedAcres"].sum() / result["countyTable"]["scenarioInsuredAcres"].sum())
+                        exported = pd.read_csv(StringIO(exportTable(result["countyTable"]).decode()), dtype={"fips": str})
+                        self.assertEqual(set(exported["crop"]), selectedCrops)
+                        np.testing.assert_allclose(exported.set_index(["fips", "crop"])[predictionColumns].sort_index(), expectedTable, rtol=1e-11, atol=1e-7)
+
     def testFutureScenarioReproducesExistingModelDWithTheSameInputs(self) -> None:
         future = projectInsurance(2026, "IA", 2023, [2012], ["CORN"])
         original = scenario(2023, 2012)

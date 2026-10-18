@@ -22,9 +22,8 @@ def allocationInputs() -> dict | None:
         year = yearColumn.selectbox("Fund scenario year", years,
                                     index=years.index(preferredProjectionYear(years[0], years[-1])),
                                     format_func=projectionYearLabel)
-        level = levelColumn.selectbox("Statewide drought assumption", ["Predict"] + LEVELS)
-        st.caption("D0-D4 applies the same hypothetical level to every county and crop. Predict uses each "
-                   "county and crop's historical drought frequencies; it is not a weather forecast.")
+        level = levelColumn.selectbox("Statewide drought assumption", LEVELS, index=LEVELS.index("D2"))
+        st.caption("D0-D4 applies the same hypothetical level to every county and crop; it is not a weather forecast.")
         fundUsd = st.number_input("State fund ($)", min_value=0.0, max_value=1_000_000_000_000.0,
                                   value=10_000_000.0, step=100_000.0, format="%.2f")
         st.write("Price assumptions ($ per bushel)")
@@ -54,9 +53,9 @@ def allocationColumnConfig() -> dict:
         "unavailableReason": "Why unavailable", "allocationReason": "Allocation basis",
         "acreageYear": st.column_config.NumberColumn("Latest acreage year", format="%d"),
         "acres": st.column_config.NumberColumn("Planted acres", format="%.0f"),
-        "insurancePayoutUsd": st.column_config.NumberColumn("D: insurance payout context ($)", format="dollar"),
-        "insurancePayoutShare": st.column_config.NumberColumn("D predicts: payout share", format="percent"),
-        "insuranceDamagedAcreShare": st.column_config.NumberColumn("D predicts: damaged-acre share", format="percent"),
+        "insurancePayoutUsd": st.column_config.NumberColumn("Predicted insurance payouts ($)", format="dollar"),
+        "insurancePayoutShare": st.column_config.NumberColumn("Predicted payout share", format="percent"),
+        "insuranceDamagedAcreShare": st.column_config.NumberColumn("Predicted damaged-acre share", format="percent"),
     }
 
 
@@ -131,20 +130,20 @@ def renderAllocationResult(result: dict) -> None:
                "loss across all crops in the selected state. Cents are balanced before county totals are added.")
     context = result.get("insuranceContext")
     if context is not None:
-        st.subheader("Connected insurance model D results")
+        st.subheader("Insurance predictions")
         st.write("Model D predicts payout share and damaged-acre share for corn and soybeans. This comparison "
                  "uses all historical climate footprints with equal weight and the latest insured exposure; "
                  f"the crop-loss allocation above uses its separate {inputs['level']} drought assumption. "
                  "Insurance payouts are a different dollar measure and do not replace the agreed fund weights.")
         payoutColumn, shareColumn, damageColumn = st.columns(3)
-        payoutColumn.metric("D · estimated insurance payouts", money(context["totals"]["X_payout_usd"]))
-        shareColumn.metric("D predicts · payout share", f"{context['totals']['payoutShare']:.2%}")
-        damageColumn.metric("D predicts · damaged-acre share", f"{context['totals']['damagedAcreShare']:.2%}")
+        payoutColumn.metric("Predicted insurance payouts", money(context["totals"]["X_payout_usd"]))
+        shareColumn.metric("Predicted payout share", f"{context['totals']['payoutShare']:.2%}")
+        damageColumn.metric("Predicted damaged-acre share", f"{context['totals']['damagedAcreShare']:.2%}")
     else:
         st.info(result.get("insuranceContextError") or
                 "Model D insurance predictions are unavailable for this state. Its trained scope is Iowa/Nebraska "
                 "corn and soybeans. The crop-loss fund still covers all supported dataset crops.")
-    st.page_link("web/pages/3_scenarios.py", label="Inspect model D predictions and exact inputs", icon=":material/arrow_forward:")
+    st.page_link("web/pages/3_scenarios.py", label="Inspect insurance predictions and exact inputs", icon=":material/arrow_forward:")
     renderAllocationTables(result)
     with st.expander("State fund allocation map"):
         renderCountyMap(result["countyTable"], inputs["state"], "allocationUsd", "stateFundMap")

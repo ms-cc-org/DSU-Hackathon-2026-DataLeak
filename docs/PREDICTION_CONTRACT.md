@@ -9,7 +9,7 @@
 | State fund | No learned prediction | Proportional allocation of one fund across positive crop-value-loss estimates, with integer-cent balancing | All supported crops together within the selected state |
 | Imagery map | No prediction | Geographic imagery with calculated result overlays | Supplied county boundaries; imagery requires network access |
 
-The active app has five tabs: Story, Explore 3D, Planner, Insurance and Evidence. Insurance is registered at `/insurance`; it is no longer a hidden page. Story links to it, Evidence shows its saved test reports, and supported state fund calculations attach its outputs with distinct column labels. The historical crop-loss lookup and the trained insurance model answer different questions and use separately disclosed assumptions.
+The active app has four tabs: Story, Explore 3D, Planner and Insurance. Insurance is registered at `/insurance`; it is no longer a hidden page. Story links to it, and supported state fund calculations attach its outputs with distinct column labels. The historical crop-loss lookup and the trained insurance model answer different questions and use separately disclosed assumptions.
 
 ## Insurance user inputs
 
@@ -19,6 +19,8 @@ The active app has five tabs: Story, Explore 3D, Planner, Insurance and Evidence
 - Insured exposure base year: a saved year from 2000–2025; future scenarios default to 2025.
 - Climate assumption: repeat a selected historical season or evaluate every 2000–2025 historical season once with equal weight. Historical footprint mode uses a single historical footprint with the target year's insured exposure.
 - Positive insured-acre and insured crop-value multipliers. They scale exposure/dollar conversion after inference, not model features or learned shares. A value multiplier is not a forecast market price.
+
+After the first **Run predictions**, every change to state, crop, mode, year, climate footprint, exposure year or multiplier automatically refreshes the inference result. Headline X/Y/Z, weighted shares, the 3D county map, crop breakdowns, audit inputs, historical comparisons and downloads all use that same selected result. A failed refresh removes the old predictions and exports instead of leaving stale values visible; a later valid change retries inference. The result caption names the included crops, exports include crop-specific filenames, and the manifest records both the selection and actual included crops.
 
 All climate features are copied together from a historical footprint for each county/crop. Each ensemble member uses the same historical year across the selected counties and crops, preserving the observed spatial pattern. The base year's insured exposure, coverage, soil, irrigation and lagged crop-history features remain assumptions. Missing model features use the saved training-fitted imputer and are explicitly listed in the input audit. Missing insured county/crop rows are outside the run, not zero payouts.
 
@@ -60,9 +62,11 @@ The fund's D0–D4/Predict drought assumption and the insurance context's histor
 
 ## Geography and evidence
 
-County allocation and insurance payout maps use transparent county overlays on public USGS imagery. Imagery is background context, not a predicted image or model input. The selected metric is unavailable for grey counties. The county-outline alternative uses local geometry and makes no imagery requests. Plotly's documented public imagery layer and attribution are used; no provider key is required: [Plotly tile layers](https://plotly.com/python/tile-map-layers/).
+Insurance displays a 3D state map using completed county payout predictions, with the statewide USD total above it. County height and amber intensity scale linearly with X relative to the largest county in the completed run; all supplied counties remain visible, unavailable estimates are grey, and selection exposes crop payouts and exposure-weighted shares. It uses the Planner viewer’s bundled three.js runtime and local boundaries, with no imagery network dependency. Main labels say “Predicted results”; model D remains identified in source explanations and exports.
 
-Evidence reads the actual saved insurance reports under `app/model/results/`, including statewide errors, top-20 capture, range coverage, baseline comparisons, state-year actuals and the Iowa corn slice. The complete official report exposes its evaluation caveats. Those reports do not validate the separate all-crop lookup or the hypothetical future ensemble. The all-crop lookup's missing held-out validation remains visible.
+County allocation maps use transparent county overlays on public USGS imagery. Imagery is background context, not a predicted image or model input. The selected metric is unavailable for grey counties. The county-outline alternative uses local geometry and makes no imagery requests. Plotly's documented public imagery layer and attribution are used; no provider key is required: [Plotly tile layers](https://plotly.com/python/tile-map-layers/).
+
+Saved insurance reports remain under `app/model/results/` for developer review, including statewide errors, top-20 capture, range coverage, baseline comparisons, state-year actuals and the Iowa corn slice. The website has no Evidence tab or links to it; Insurance replay still shows historical actuals. The complete official report exposes its evaluation caveats. Those reports do not validate the separate all-crop lookup or the hypothetical future ensemble. The all-crop lookup's missing held-out validation remains visible.
 
 ## Public adapter functions
 
@@ -78,4 +82,11 @@ heldOutReplay = replayInsurance(2023, state="IA")
 
 `projectInsurance` accepts optional `footprintYears`, `crops`, `acresScale` and `priceScale`. `footprintYears=None` evaluates all saved historical seasons once. All adapters return `countyTable`, `drawTable`, `modelInputs`, `scenarioTotals`, `totals`, `metadata`, `range`, `flaggedRows` and `imputedInputRows`. The original `src.engine` contract remains available and unchanged.
 
-Run `python -m unittest discover -s tests -v`. Tests cover original D reproduction, exact feature substitution, unchanged predictions under year-only relabeling, scenario scaling, ensemble aggregation, input/output exports, all-crop fund conservation, supported/unsupported scope, five-page navigation, replay actuals and map configuration. Functional verification does not establish future predictive accuracy.
+Run `python -m unittest discover -s tests -v`. Tests cover original D reproduction, exact feature substitution, unchanged predictions under year-only relabeling, scenario scaling, ensemble aggregation, input/output exports, all-crop fund conservation, supported/unsupported scope, four-page navigation, replay actuals and map configuration. Functional verification does not establish future predictive accuracy.
+
+
+## Required verification for insurance/model changes
+
+A model or insurance UI change must be checked through selection → saved inference → aggregation → displayed metrics/map/table → exported predictions and assumptions. Rendering a page successfully is insufficient. Change controls **after** a result exists, without another run click, and confirm the resulting crop/state/year and values across every surface. Cover both states, corn/soybeans/all crops and future/historical-footprint/replay modes; retain failure recovery and Planner handoff checks.
+
+`tests/test_insurance_scenarios.py` compares every county's two predicted shares directly with the frozen D artifacts, then independently calculates X/Y/Z and damaged acres from the audited exposures and documented formulas. It covers 18 mode/state/crop combinations (the future cases use all historical footprints), reconciles weighted statewide shares and verifies CSV content. `tests/test_connected_app.py` verifies the rendered metrics, county/crop table and embedded 3D payload after changing selections, plus stale-result removal on errors. Dollar comparisons use sub-cent tolerances and displayed amounts use the same whole-dollar formatting as the UI. These checks establish faithful presentation of the model output, not future forecast accuracy.

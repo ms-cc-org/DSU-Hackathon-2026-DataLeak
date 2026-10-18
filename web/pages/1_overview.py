@@ -6,7 +6,6 @@ import streamlit as st
 
 from src.data_loader import load_counties, load_master
 from web.render3d import STATES, loadSeasonPeak
-from web.model_evidence import loadModelMetrics
 from web.ui import DROUGHT_COLORS, DROUGHT_LABELS, DROUGHT_WORDS, GROUND, animatedStats, duskHero, showVideo
 
 
@@ -25,7 +24,6 @@ PAGE_CSS = """
 .drChapterNum { font: 500 2.4rem "JetBrains Mono", ui-monospace, monospace; color: #F2A33A; }
 .drChapter h3 { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-size: 1.9rem; line-height: 1.15; margin: .3rem 0 .6rem; }
 .drChapter p { color: #B9C0C7; font-size: 1.05rem; line-height: 1.6; max-width: 460px; }
-.drEvidenceTitle { font-family: "Bricolage Grotesque", "DM Sans", sans-serif; font-size: 1.25rem; font-weight: 700; margin-bottom: .4rem; }
 </style>
 """
 
@@ -85,11 +83,6 @@ def droughtMap() -> None:
                "reached in each county. Real weekly maps for all 253 counties.")
 
 
-def evidenceCard(key: str, title: str, body: str) -> None:
-    with st.container(key=key):
-        st.html(f'<div class="drEvidenceTitle">{title}</div>')
-        st.markdown(body)
-
 
 # ---------------------------------------------------------------------------
 # Page
@@ -106,7 +99,7 @@ if not showVideo("intro_loop.mp4", caption="Illustrative animation (AI-generated
             st.page_link("web/pages/2_county_risk.py", label="Explore in 3D", icon=":material/view_in_ar:")
         with st.container(key="ctasecondary", width="content"):
             st.page_link("web/pages/3_planner.py", label="Open the planner", icon=":material/tune:")
-st.page_link("web/pages/3_scenarios.py", label="Run trained insurance model D", icon=":material/arrow_forward:")
+st.page_link("web/pages/3_scenarios.py", label="View insurance predictions", icon=":material/arrow_forward:")
 st.caption("Model D predicts insurance payout share and damaged-acre share for Iowa/Nebraska corn and soybeans. "
            "The all-crop Planner uses a separate historical crop-loss lookup; fund allocations are policy arithmetic.")
 
@@ -137,27 +130,6 @@ with mapColumn:
             droughtMap()
         except Exception as error:
             st.warning(f"The drought map could not be drawn: {error}")
-
-st.subheader("Evidence and prediction sources")
-first, second, third = st.columns(3)
-with first:
-    evidenceCard("cardEv1", "Insurance model D",
-                 "**Saved 2016–2025 test results.** Payout share and damaged-acre share are learned predictions. "
-                 "Future insurance scenarios use the full 2000–2025 fit and assumed climate footprints.")
-with second:
-    try:
-        metrics = loadModelMetrics()
-        modelRow = metrics.loc[metrics["target"].eq("t1") & metrics["model"].eq("D") & metrics["group"].eq("all")].iloc[0]
-        evidenceCard("cardEv2", "Measured model limitations",
-                     f"Mean statewide payout error: **USD {modelRow['stat_abs_err'] / 1_000_000:.1f}M**. "
-                     f"Top-20 county capture: **{modelRow['capture_top20']:.1%}**. Baselines and worst misses are on Evidence.")
-    except (OSError, ValueError, KeyError, IndexError):
-        evidenceCard("cardEv2", "Insurance evidence unavailable", "The saved metric file could not be read. See Evidence for diagnostics.")
-with third:
-    evidenceCard("cardEv3", "All-crop planning lookup",
-                 "**Not validated as a future loss forecast.** Missing records stay visible; coverage is computed "
-                 "from the supplied data. Proportional fund shares are calculated from available crop-loss estimates.")
-st.page_link("web/pages/5_method_and_data.py", label="See the Evidence tab", icon=":material/arrow_forward:")
 
 st.html('<div class="drFooter">Data: USDA NASS · U.S. Drought Monitor · NOAA ACIS · NRCS SSURGO · MODIS<br>'
         'AI use and full credits: see the README</div>')

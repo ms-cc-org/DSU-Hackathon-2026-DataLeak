@@ -43,7 +43,7 @@ st.write("Estimate the crop-value loss for one county under a drought level you 
 st.info("Source: historical crop-loss lookup. This page estimates yield loss and converts it to crop-value dollars. "
         "The trained insurance model D predicts payout share and damaged-acre share; its results appear in "
         "Insurance and alongside supported state fund calculations below.")
-st.page_link("web/pages/3_scenarios.py", label="Open trained insurance model D predictions", icon=":material/arrow_forward:")
+st.page_link("web/pages/3_scenarios.py", label="Open insurance predictions", icon=":material/arrow_forward:")
 
 st.subheader("Scenario")
 inputsColumn, outputsColumn = st.columns([5, 7], gap="medium")
@@ -91,10 +91,6 @@ with outputsColumn:
             else:
                 st.html(f'<div class="drRangeNote">Range of the nearest years only: {result["low"]:.1f}% to '
                         f'{result["high"]:.1f}% below the county trend. No confident estimate.</div>')
-            if result["predict"]:
-                st.html(f'<div class="drMono">Historical frequency of each drought level by Aug 15 · most common '
-                        f'{LEVELS[result["bucket"]]}</div>')
-                probabilityBars(result["probs"])
             st.html('<div class="drMono" style="margin-top:12px">Closest 3 historical years</div>')
             nearest = pd.DataFrame([{"Year": h["year"], "Drought level by Aug 15": LEVELS[h["bucket"]],
                                      "Actual loss (% below trend)": round(h["loss"], 1)} for h in result["nearest"]])

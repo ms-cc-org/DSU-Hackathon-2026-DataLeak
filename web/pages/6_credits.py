@@ -1,4 +1,4 @@
-"""Superseded by the Evidence tab, which shows this content; kept on disk, not registered in app.py."""
+"""Legacy credits page; kept on disk, not registered in app.py. Current credits are in README.md."""
 
 import streamlit as st
 

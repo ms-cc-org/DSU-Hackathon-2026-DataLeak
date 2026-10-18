@@ -7,7 +7,7 @@ import streamlit as st
 
 from src.insurance_scenarios import insuranceAnalogContext, insuranceCrops, insuranceInventory, insuranceStates
 from web.insurance_data import runInsurance
-from web.maps import renderCountyMap
+from web.insurance_map import renderInsuranceMap
 from web.model_evidence import loadInsuranceActuals
 from web.ui import CROP_NAMES, markdownSafe
 
@@ -24,12 +24,12 @@ def predictionDefinitions() -> pd.DataFrame:
     ])
 
 
-def insuranceInputs() -> dict | None:
-    """Collect a supported model scenario with visible exposure and climate assumptions."""
+def insuranceInputs() -> tuple[dict, bool]:
+    """Collect reactive scenario controls and the initial run action."""
     inventory = insuranceInventory()
     mode = st.radio("Insurance calculation", ["Future insurance scenario", "Historical footprint scenario", "Historical replay"],
                     horizontal=True, key="insuranceMode")
-    with st.form("insuranceModelInputs"):
+    with st.container(border=True):
         stateColumn, cropColumn, yearColumn = st.columns(3)
         state = stateColumn.selectbox("Insurance state", list(insuranceStates), format_func=insuranceStates.get,
                                        key="insuranceState")
@@ -77,9 +77,9 @@ def insuranceInputs() -> dict | None:
             st.caption("Multipliers change exposure and dollar conversion after prediction. They do not change "
                        "model D's features or learned payout/damaged-acre shares. With the same assumptions, "
                        "2026 and 2027 have the same result: D has no future-year trend feature.")
-        submitted = st.form_submit_button("Run model D", type="primary")
+        submitted = st.button("Run predictions", type="primary")
     return {"mode": mode, "state": state, "crop": crop, "year": year, "baseYear": baseYear,
-            "footprint": footprint, "acresScale": acresScale, "priceScale": priceScale} if submitted else None
+            "footprint": footprint, "acresScale": acresScale, "priceScale": priceScale}, submitted
 
 
 def exportTable(table: pd.DataFrame) -> bytes:
@@ -95,8 +95,8 @@ def insuranceColumnConfig() -> dict:
     """Put prediction source and units directly in the result column labels."""
     return {
         "fips": st.column_config.TextColumn("County FIPS"), "county": "County", "crop": "Crop", "year": "Target year",
-        "pred_payout_share": st.column_config.NumberColumn("D predicts: payout share", format="percent"),
-        "pred_damaged_acre_share": st.column_config.NumberColumn("D predicts: damaged-acre share", format="percent"),
+        "pred_payout_share": st.column_config.NumberColumn("Predicted payout share", format="percent"),
+        "pred_damaged_acre_share": st.column_config.NumberColumn("Predicted damaged-acre share", format="percent"),
         "X_payout_usd": st.column_config.NumberColumn("X: estimated insurance payouts", format="dollar"),
         "Y_deductible_exposure_usd": st.column_config.NumberColumn("Y: deductible exposure", format="dollar"),
         "Z_relief_95pct_usd": st.column_config.NumberColumn("Z: illustrative 95% relief", format="dollar"),
@@ -113,6 +113,9 @@ def renderInsuranceAudit(result: dict) -> None:
     """Expose exact model inputs and allow all results and provenance to be downloaded."""
     metadata = result["metadata"]
     with st.expander("Exact model inputs and assumptions"):
+        st.write(f"Source: **Model D · Tweedie GLM**, alpha 0.001, power 1.5, uncalibrated. "
+                 f"Artifact: **{metadata['modelArtifact']}**; trained **{metadata['trainingYears']}**. "
+                 f"{metadata['evaluationLabel']}.")
         st.write(f"Insured exposure and non-climate history: **{metadata['exposureBaseYear']}**. "
                  f"Climate source: **{metadata['climateSource']}**. "
                  f"Insured-acre multiplier: **{metadata['acresScale']}**; insured-value multiplier: **{metadata['priceScale']}**.")
@@ -131,8 +134,9 @@ def renderInsuranceAudit(result: dict) -> None:
                              "This is not the ensemble spread or a calibrated probability interval."))
         st.dataframe(pd.DataFrame(analogContext["closestYears"]), hide_index=True, width="stretch")
     downloadColumns = st.columns(3)
-    filePrefix = f"model_D_{metadata['state']}_{metadata['targetYear']}"
-    downloadColumns[0].download_button("Download model predictions", exportTable(result["countyTable"]),
+    cropSuffix = "all_crops" if len(metadata["crops"]) > 1 else metadata["crops"][0].lower()
+    filePrefix = f"insurance_{metadata['state']}_{metadata['targetYear']}_{cropSuffix}"
+    downloadColumns[0].download_button("Download predictions", exportTable(result["countyTable"]),
                                         file_name=f"{filePrefix}_predictions.csv", mime="text/csv")
     downloadColumns[1].download_button("Download exact model inputs", exportTable(result["modelInputs"]),
                                         file_name=f"{filePrefix}_inputs.csv", mime="text/csv")
@@ -143,13 +147,15 @@ def renderInsuranceAudit(result: dict) -> None:
 def renderInsuranceResults(result: dict) -> None:
     """Display direct predictions separately from their X/Y/Z dollar arithmetic."""
     metadata, totals = result["metadata"], result["totals"]
-    st.subheader(f"Model D results · {insuranceStates[metadata['state']]} · {metadata['targetYear']}")
-    st.caption(f"{metadata['runMode']} · {metadata['modelArtifact']} · trained {metadata['trainingYears']} · "
-               f"{metadata['evaluationLabel']}. Showing the last completed run; use Run model D to apply edited controls.")
-    payoutColumn, shareColumn, damageColumn = st.columns(3)
-    payoutColumn.metric("X · estimated insurance payouts", f"${totals['X_payout_usd']:,.0f}")
-    shareColumn.metric("D predicts · payout share", f"{totals['payoutShare']:.2%}")
-    damageColumn.metric("D predicts · damaged-acre share", f"{totals['damagedAcreShare']:.2%}")
+    st.subheader(f"Predicted results · {insuranceStates[metadata['state']]} · {metadata['targetYear']}")
+    cropLabel = " + ".join(CROP_NAMES[crop] for crop in metadata["crops"])
+    st.caption(f"{cropLabel} · {metadata['runMode']} · {metadata['evaluationLabel']}. "
+               "Results update automatically when scenario controls change.")
+    st.metric("Predicted insurance payouts", f"${totals['X_payout_usd']:,.0f}")
+    renderInsuranceMap(result["countyTable"], metadata["state"], metadata["targetYear"])
+    shareColumn, damageColumn = st.columns(2)
+    shareColumn.metric("Predicted payout share", f"{totals['payoutShare']:.2%}")
+    damageColumn.metric("Predicted damaged-acre share", f"{totals['damagedAcreShare']:.2%}")
     st.caption("Payout share is weighted by scenario liability; damaged-acre share is weighted by scenario insured acres. "
                "X converts the predicted payout share to dollars. Statewide percentages are not sums of county percentages.")
     deductibleColumn, reliefColumn, acresColumn = st.columns(3)
@@ -189,8 +195,6 @@ def renderInsuranceResults(result: dict) -> None:
                  width="stretch", column_config=insuranceColumnConfig())
     st.caption(f"{len(table)} insured county/crop combinations are included. Other states, crops or counties "
                "are outside this model run, not zero-loss records. All-crop coverage is available in Planner.")
-    with st.expander("Insurance payout map", expanded=False):
-        renderCountyMap(table, metadata["state"], "X_payout_usd", "insurancePayoutMap")
     with st.expander("Predicted statewide payouts for each historical climate footprint"):
         st.dataframe(result["scenarioTotals"], hide_index=True, width="stretch")
     renderInsuranceAudit(result)
@@ -198,29 +202,29 @@ def renderInsuranceResults(result: dict) -> None:
 
 def renderInsurancePlanner() -> None:
     """Run the prefit engine from an active page with unambiguous model provenance."""
-    st.title("Insurance predictions from model D.")
-    st.write("Model D directly predicts **payout share** and **damaged-acre share**. Those predictions are "
+    st.title("Insurance predictions.")
+    st.write("Predict **payout share** and **damaged-acre share**. Those predictions are "
              "converted into insurance payout dollars and supporting exposure figures below. "
              "Supported: Iowa and Nebraska, corn and soybeans.")
-    with st.expander("What is predicted, assumed and calculated?", expanded=True):
+    with st.expander("What is predicted, assumed and calculated?", expanded=False):
         st.dataframe(predictionDefinitions(), hide_index=True, width="stretch")
     st.caption("California, Delaware, winter wheat and sorghum remain available in the crop-loss Planner. "
-               "They are outside model D's trained scope; model D's features and settings remain unchanged.")
+               "They are outside the insurance model's trained scope.")
     handoff = st.session_state.pop("insuranceHandoff", None)
     if handoff is not None:
         for key, value in handoff.items():
             st.session_state[key] = value
     try:
-        inputs = insuranceInputs()
-        if inputs is not None:
-            with st.spinner("Running the saved model D on the selected scenario…"):
+        inputs, submitted = insuranceInputs()
+        if submitted or st.session_state.get("insuranceStarted", False) or "insuranceResult" in st.session_state:
+            st.session_state["insuranceStarted"] = True
+            with st.spinner("Calculating predictions for the selected scenario…"):
                 st.session_state["insuranceResult"] = runInsurance(inputs)
         if "insuranceResult" in st.session_state:
             renderInsuranceResults(st.session_state["insuranceResult"])
         else:
-            st.info("Choose a future scenario or historical replay, then Run model D to see actual model predictions.")
+            st.info("Choose a future scenario or historical replay, then Run predictions to see the results.")
     except (OSError, ValueError, KeyError, IndexError) as error:
         st.session_state.pop("insuranceResult", None)
         st.error(f"Insurance inference could not run: {error}")
     st.page_link("web/pages/3_planner.py", label="Open the all-crop loss and fund Planner", icon=":material/arrow_forward:")
-    st.page_link("web/pages/5_method_and_data.py", label="Review model D's saved test results", icon=":material/fact_check:")

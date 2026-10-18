@@ -10,13 +10,19 @@ def runInsurance(inputs: dict) -> dict:
     """Cache inference results only; fitting is never part of a page request."""
     crops = None if inputs["crop"] == "ALL" else [inputs["crop"]]
     if inputs["mode"] == "Historical replay":
-        return replayInsurance(inputs["year"], inputs["state"], crops)
-    if inputs["mode"] == "Historical footprint scenario":
-        return historicalInsuranceScenario(inputs["baseYear"], inputs["footprint"], inputs["state"], crops,
+        result = replayInsurance(inputs["year"], inputs["state"], crops)
+    elif inputs["mode"] == "Historical footprint scenario":
+        result = historicalInsuranceScenario(inputs["baseYear"], inputs["footprint"], inputs["state"], crops,
                                              inputs["acresScale"], inputs["priceScale"])
-    return projectInsurance(inputs["year"], inputs["state"], inputs["baseYear"],
+    elif inputs["mode"] == "Future insurance scenario":
+        result = projectInsurance(inputs["year"], inputs["state"], inputs["baseYear"],
                              None if inputs["footprint"] == "ALL" else [inputs["footprint"]], crops,
                              inputs["acresScale"], inputs["priceScale"])
+    else:
+        raise ValueError(f"Unknown insurance calculation: {inputs['mode']}")
+    result["metadata"]["crops"] = sorted(result["countyTable"]["crop"].unique())
+    result["metadata"]["selection"] = dict(inputs)
+    return result
 
 
 def insuranceContextForFund(state: str, year: int) -> dict | None:

@@ -50,3 +50,54 @@ Historical replay, historical footprint mode, Nebraska single-crop selection, ac
 - Insurance context and the all-crop fund have separately disclosed climate assumptions. Context does not change crop-loss eligibility or fund weights.
 - Imagery needs network access and is geographic background, not future imagery. Local outlines and numerical workflows work without imagery tiles.
 - After source/navigation changes, restart an older Streamlit process once to reload imported modules. No database or provider credential is required.
+
+
+## Insurance 3D result presentation — October 18, 2026
+
+This update replaces the former Insurance payout map with a visible 3D state map using the existing bundled three.js runtime and local county geometry. Main headings/buttons/metrics use “Predicted results” / “Run predictions”; model D remains named in source explanations, input breakdowns and exported provenance. The formatted statewide payout total appears immediately above the map. Fund allocation maps retain their existing imagery.
+
+Focused verification:
+
+- `test_insurance_map.py`: 2 tests passed — every IA/NE boundary remains visible, crop totals conserve payouts, county shares use exposure weights, zero estimates remain distinct from missing estimates.
+- `test_connected_app.py`: 6 tests passed — active page rendering, actual prediction values, IA map total/count, NE single-crop map state/year/total, historical modes, downloads and fund handoff.
+- `test_engine.py`: 8 tests passed — official payout reproduction, scaling, flags and planning-band behavior; no model artifacts/settings/features changed.
+- `test_allocation_ui.py`: 4 tests passed — all-state fund UI, future year, crop filter and zero-price handling.
+- JavaScript module syntax, Python compilation and `git diff --check` passed.
+
+Browser verification: Iowa 2026, both insured crops, all historical climate footprints displays **$206,073,072** above the 99-county extruded map. Plymouth County displays **$6,259,272**, split into corn **$4,193,831** and soybeans **$2,065,441**. Clicking Jasper County updates the detail to **$3,162,954**; the Aerial control changes the camera. No browser console warnings/errors occurred. The map uses actual completed inference results, not the crop-loss lookup. A WebGL failure leaves a clear fallback message and the prediction table available.
+
+The connected UI check exposed two pre-existing references to the removed crop-loss “Predict” mode: the county page still read a removed result key, and the fund form still defaulted to an unsupported option. The stale county block was removed; the fund now offers its supported D0–D4 inputs with D2 as default. The existing all-crop proportional allocation rule is unchanged. Legacy backend tests that still request the removed “Predict” option were outside this focused verification; this is not a new full-suite pass.
+
+The existing port 8501 app was restarted to clear cached UI imports. No commit or push was made.
+
+
+## Reactive Insurance selections and numerical reconciliation — October 18, 2026
+
+**Reported failure:** after running both crops, selecting Corn or Soybeans still displayed both crops' costs. A regression test reproduced both failures before the fix. The submit-only form deferred changes and continued rendering the previous run. Insurance now uses reactive controls: after the first Run predictions, changing any scenario selection refreshes all outputs using the same cached inference request. The result caption identifies the actual included crops. The prediction manifest includes the requested selection and included crop list; filenames distinguish corn, soybeans and all crops. A failed refresh removes the old map, metrics and downloads, and the next valid refresh retries.
+
+**Automated checks (20 tests passed):**
+
+- `python -m unittest discover -s tests -p 'test_insurance_scenarios.py' -v`: **10 passed** in 5.146s. The new matrix covers 18 combinations of IA/NE × corn/soybeans/all × future/historical footprint/replay. Every county's two shares are checked directly against the saved model artifacts, X/Y/Z and damaged acres are independently recomputed from audited exposures, statewide sums/weighted shares reconcile, and exported CSV values match. Future cases evaluate every saved climate footprint. Existing official replay reproduction checks pass.
+- `python -m unittest discover -s tests -p 'test_connected_app.py' -v`: **10 passed** in 15.569s. Tests change controls after results exist without another Run click, including crop, state, year, exposure year, climate footprint and acreage/value multipliers. The displayed X/Y/Z metrics, county/crop table and every county map payout are reconciled with the selected run; all historical modes, failure recovery and fund handoff pass.
+- Python compilation and `git diff --check` passed. Model artifacts, features, settings and core inference files are unchanged. This is focused verification of the affected Insurance flow, not a full-suite claim.
+
+**Live browser checks**, unchanged Iowa 2026 / exposure 2025 / all historical seasons / 1× multipliers:
+
+| Selection | Included county/crop rows | Statewide predicted X | Plymouth County predicted X |
+|---|---:|---:|---:|
+| All insured crops | 198 | $206,073,071.63 | $6,259,271.79 |
+| Corn | 99 | $143,831,222.52 | $4,193,830.94 |
+| Soybeans | 99 | $62,241,849.11 | $2,065,440.85 |
+
+Changing All → Corn → Soybeans in the browser, without clicking Run again, updates the headline, map crop label, county amount and crop breakdown. The UI correctly rounds these values to whole dollars. No browser console errors/warnings occurred. Screenshot: `/tmp/insurance-soybean-selection.png`. The app on port 8501 was restarted to load the updated modules. No commit or push was made.
+
+Future model-related changes must follow the selection-to-output verification gate in `docs/PREDICTION_CONTRACT.md`. Numerical agreement establishes faithful display of existing model predictions, not improved forecast accuracy.
+
+
+## Evidence page removal — October 18, 2026
+
+Removed the Evidence navigation entry, page file, Story report-card section and links from Story/Insurance. Removed the unused report renderer; the historical insurance outcome loader remains available for replay comparisons. The active navigation is Story, Explore 3D, Planner and Insurance. Saved model reports remain in `app/model/results/` and credits remain in README.md.
+
+`python -m unittest discover -s tests -p 'test_connected_app.py' -v`: **10 passed** in 14.577s, including all four remaining pages, no Evidence page links, the removed page file, reactive crop selection, numerical display reconciliation, historical modes, failure recovery and Planner handoff. Python compilation and `git diff --check` passed. No prediction settings or model artifacts changed.
+
+Live browser verification confirms exactly four navigation tabs (Story, Explore 3D, Planner, Insurance), no Evidence links on Insurance, and the cleaned Story page. The existing port 8501 app was restarted. Screenshot: `/tmp/four-tab-navigation.png`.
