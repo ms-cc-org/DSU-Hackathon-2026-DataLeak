@@ -1,0 +1,11 @@
+{
+  "official_reference": "app/model/results/test_state_years.csv",
+  "reference_provenance": "Aggregated from saved results/test_predictions.csv",
+  "state_year_differences_usd": {
+    "IA 2023": 8.940696716308594e-07,
+    "NE 2022": 3.5762786865234375e-07
+  },
+  "test_fit_rows": 5835,
+  "full_fit_rows": 9517,
+  "inference_rows": 9620
+}
