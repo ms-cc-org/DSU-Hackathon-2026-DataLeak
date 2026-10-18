@@ -21,9 +21,9 @@ st.set_page_config(
 currentPage = st.navigation(
     [
         st.Page("web/pages/1_overview.py", title="Story", default=True),
-        st.Page("web/pages/2_county_risk.py", title="Explore 3D"),
-        st.Page("web/pages/3_planner.py", title="Planner"),
-        st.Page("web/pages/5_method_and_data.py", title="Evidence"),
+        st.Page("web/pages/2_county_risk.py", title="Explore 3D", url_path="explore"),
+        st.Page("web/pages/3_planner.py", title="Planner", url_path="planner"),
+        st.Page("web/pages/5_method_and_data.py", title="Evidence", url_path="evidence"),
     ],
     position="top",
 )

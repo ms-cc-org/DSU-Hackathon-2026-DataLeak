@@ -18,7 +18,9 @@ COVERAGE_FILE = REPO_ROOT / "docs" / "coverage.csv"
 PAGE_CSS = """
 <style>
 /* CTAs sit over the lower part of the hero frame */
-.st-key-heroCtas { margin-top: -300px; margin-left: clamp(20px, 5vw, 64px); position: relative; z-index: 3; margin-bottom: 218px; }
+.st-key-heroCtas { margin-top: -300px; margin-left: clamp(20px, 5vw, 64px); margin-right: 16px; position: relative;
+  z-index: 3; margin-bottom: 218px; flex-wrap: wrap; width: auto; max-width: calc(100% - 36px); }
+@media (max-width: 640px) { .st-key-heroCtas { flex-direction: column; align-items: flex-start; } }
 /* Chapters scroll on the left while the map stays pinned on the right (wide screens only) */
 @media (min-width: 900px) {
   [data-testid="stHorizontalBlock"]:has(.st-key-stickymap) { align-items: flex-start; }

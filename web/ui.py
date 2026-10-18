@@ -90,8 +90,9 @@ GLOBAL_CSS = f"""
 /* Top bar: brand on the left, pill tabs, a small mono decision label on the right */
 [data-testid="stHeader"] {{ background: var(--ground); border-bottom: 1px solid var(--line); }}
 [data-testid="stHeaderLogo"] {{ height: 34px; width: 34px; }}
-div:has(> [data-testid="stHeaderLogo"]) {{ display: flex; align-items: center; gap: 10px; }}
-div:has(> [data-testid="stHeaderLogo"])::after {{ content: "Drought Relief Planner"; font-family: var(--display);
+div:has(> [data-testid="stHeaderLogo"]), a:has(> [data-testid="stHeaderLogo"]), button:has(> [data-testid="stHeaderLogo"]) {{ display: flex; align-items: center; gap: 10px; text-decoration: none; }}
+div:has(> [data-testid="stHeaderLogo"])::after, a:has(> [data-testid="stHeaderLogo"])::after,
+button:has(> [data-testid="stHeaderLogo"])::after {{ content: "Drought Relief Planner"; font-family: var(--display);
   font-weight: 700; font-size: 1.05rem; color: var(--text); white-space: nowrap; }}
 [data-testid="stToolbarActions"]::before {{ content: "Iowa · corn · Aug 15 decision"; font-family: var(--mono);
   font-size: .72rem; letter-spacing: .06em; color: var(--muted); margin-right: 12px; align-self: center; white-space: nowrap; }}
@@ -101,7 +102,8 @@ div:has(> [data-testid="stHeaderLogo"])::after {{ content: "Drought Relief Plann
 [data-testid="stTopNavLink"]:hover {{ border-color: var(--amber); }}
 [data-testid="stTopNavLink"][aria-current="page"] {{ background: var(--amber); border-color: var(--amber); }}
 [data-testid="stTopNavLink"][aria-current="page"] p {{ color: var(--ground); font-weight: 700; }}
-@media (max-width: 760px) {{ [data-testid="stToolbarActions"]::before, div:has(> [data-testid="stHeaderLogo"])::after {{ display: none; }} }}
+@media (max-width: 760px) {{ [data-testid="stToolbarActions"]::before, div:has(> [data-testid="stHeaderLogo"])::after,
+  a:has(> [data-testid="stHeaderLogo"])::after, button:has(> [data-testid="stHeaderLogo"])::after {{ display: none; }} }}
 
 /* Page */
 .block-container {{ padding-top: 4.2rem; max-width: 1440px; }}
@@ -247,7 +249,8 @@ def animatedStats(stats: list[tuple[str, float, str]]) -> None:
 .drStat:hover {{ transform: translateY(-3px); border-color: rgba(242,163,58,.5); }}
 .drNum {{ font: 500 1.3rem "JetBrains Mono", ui-monospace, monospace; color: {AMBER}; font-variant-numeric: tabular-nums; }}
 .drLab {{ color: {TEXT_2}; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-@media (max-width: 640px) {{ .drStats {{ grid-template-columns: repeat(2, 1fr); }} }}
+@media (max-width: 640px) {{ .drStats {{ grid-template-columns: repeat(2, 1fr); }} .drStat {{ border-radius: 18px; }}
+  .drLab {{ white-space: normal; overflow: visible; text-overflow: clip; }} }}
 </style>
 <script>
 (function () {{
