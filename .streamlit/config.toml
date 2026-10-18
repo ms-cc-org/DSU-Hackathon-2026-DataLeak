@@ -1,7 +1,52 @@
-# Dark theme that matches the 3D viewer. Only presentation settings live here.
+# "Dusk field" theme. Only presentation settings live here.
+# Fonts are bundled in static/fonts/ (SIL Open Font License) and served by Streamlit, so the app
+# needs no network; if a font file is missing the system fallback in each stack is used.
+
+[server]
+enableStaticServing = true
+
 [theme]
 base = "dark"
-primaryColor = "#f0b429"
-backgroundColor = "#0d1117"
-secondaryBackgroundColor = "#151c26"
-textColor = "#e8ecf1"
+primaryColor = "#F2A33A"
+backgroundColor = "#0E1318"
+secondaryBackgroundColor = "#151C23"
+textColor = "#E8E4DA"
+borderColor = "#26313B"
+linkColor = "#F2A33A"
+font = "DM Sans, system-ui, -apple-system, Segoe UI, sans-serif"
+headingFont = "Bricolage Grotesque, DM Sans, system-ui, sans-serif"
+codeFont = "JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace"
+headingFontWeights = 700
+baseRadius = "20px"
+buttonRadius = "999px"
+showWidgetBorder = true
+
+[[theme.fontFaces]]
+family = "Bricolage Grotesque"
+url = "app/static/fonts/bricolage-grotesque-latin-700-normal.woff2"
+weight = "700"
+
+[[theme.fontFaces]]
+family = "DM Sans"
+url = "app/static/fonts/dm-sans-latin-400-normal.woff2"
+weight = "400"
+
+[[theme.fontFaces]]
+family = "DM Sans"
+url = "app/static/fonts/dm-sans-latin-500-normal.woff2"
+weight = "500"
+
+[[theme.fontFaces]]
+family = "DM Sans"
+url = "app/static/fonts/dm-sans-latin-700-normal.woff2"
+weight = "700"
+
+[[theme.fontFaces]]
+family = "JetBrains Mono"
+url = "app/static/fonts/jetbrains-mono-latin-400-normal.woff2"
+weight = "400"
+
+[[theme.fontFaces]]
+family = "JetBrains Mono"
+url = "app/static/fonts/jetbrains-mono-latin-500-normal.woff2"
+weight = "500"

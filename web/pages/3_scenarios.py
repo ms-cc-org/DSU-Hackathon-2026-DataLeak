@@ -1,4 +1,4 @@
-"""Hypothetical corn-loss scenario page scaffold."""
+"""Superseded by the Planner tab (web/pages/3_planner.py); kept on disk, not registered in app.py."""
 
 import streamlit as st
 

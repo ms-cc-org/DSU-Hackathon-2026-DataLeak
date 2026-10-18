@@ -1,4 +1,4 @@
-"""State funding and allocation page scaffold."""
+"""Superseded by the Planner tab (web/pages/3_planner.py, step 2); kept on disk, not registered in app.py."""
 
 import streamlit as st
 
