@@ -11,16 +11,13 @@ from src.projections import preferredProjectionYear, projectionYearLabel
 from web.allocation_ui import renderStateFundPlanner
 from web.render3d import CROPS, DEFAULT_FIPS, LAST_YEAR, LAST_PROJECTED_YEAR, STATES, loadCountyHistory
 from web.scenario_lookup import LEVELS, countyRecords, scenario
-from web.ui import CROP_NAMES, DEFAULT_PRICE, DROUGHT_COLORS, eyebrow, markdownSafe, money
+from web.ui import CROP_NAMES, DEFAULT_PRICE, eyebrow, markdownSafe, money
 
 
 PAGE_CSS = """
 <style>
 .drRange { font: 500 clamp(28px, 4vw, 44px)/1.1 "JetBrains Mono", ui-monospace, monospace; color: #F2A33A; }
 .drRangeNote { color: #B9C0C7; margin: 4px 0 14px; }
-.drProb { display: flex; align-items: center; gap: 8px; margin: 5px 0; font: 12.5px "JetBrains Mono", monospace; }
-.drProb .track { flex: 1; height: 10px; background: #0E1318; border-radius: 999px; overflow: hidden; border: 1px solid #26313B; }
-.drProb .fill { height: 100%; border-radius: 999px; }
 .drWarn { background: rgba(242,163,58,.12); border: 1px solid rgba(242,163,58,.5); border-radius: 14px; padding: 10px 12px; margin: 6px 0 12px; }
 @media (min-width: 900px) { .st-key-cardInputs { max-width: 460px; } }
 </style>
@@ -32,16 +29,6 @@ def countyOptions() -> pd.DataFrame:
     frames = [loadCountyHistory(None, crop)[["fips", "county_name", "state_alpha"]].drop_duplicates() for crop in CROPS]
     counties = pd.concat(frames).drop_duplicates("fips")
     return counties.sort_values(["state_alpha", "county_name"]).reset_index(drop=True)
-
-
-def probabilityBars(probs: list[float]) -> None:
-    rows = "".join(
-        f'<div class="drProb"><span style="width:26px">{level}</span><div class="track">'
-        f'<div class="fill" style="width:{100 * p:.0f}%; background:{DROUGHT_COLORS[b + 1]}"></div></div>'
-        f'<span style="width:38px;text-align:right">{100 * p:.0f}%</span></div>'
-        for b, (level, p) in enumerate(zip(LEVELS, probs))
-    )
-    st.html(rows)
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +61,7 @@ with inputsColumn:
                             format_func=projectionYearLabel)
         st.caption("Projections stop at 2030. 2026-2030 trend yield is a linear extension of the county's "
                    "2000-2025 trend.")
-        level = st.segmented_control("Drought level", LEVELS + ["Predict"], default="Predict") or "Predict"
+        level = st.segmented_control("Drought level", LEVELS, default="D2") or "D2"
         price = st.number_input(f"Price assumption ({CROP_NAMES[crop].lower()}, $ per bushel)", min_value=0.0,
                                 value=DEFAULT_PRICE[crop], step=0.25, key=f"planPrice_{crop}",
                                 help="An editable assumption, not a cited market price.")

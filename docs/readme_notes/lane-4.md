@@ -43,9 +43,10 @@ Branch: `lane-4-app`. Files owned: `app.py`, `web/render3d.py`, `web/ui.py`, `we
   calls `src/allocation.py` now.
 - **Lane 2 (engine):** the Planner and the viewer's Scenario mode use one prototype lookup, `web/scenario_lookup.py`
   (Python) and `runEngine` in the viewer (JavaScript). Both read the same county records, so they show identical numbers:
-  - It takes past years whose Aug 15 drought level matches the input, and reports their median loss and min-max range.
+  - It takes past years whose Aug 15 drought level matches the input, and reports their median loss.
   - It falls back to the nearest 3 years with a warning when there are fewer than 2 matches or the input is out of range.
-  - "Predict" weights each level by its 2000-2025 frequency.
+  - Both show one estimate (the median, or the nearest-years average with a warning). Neither has a "Predict" option or
+    a low-high range.
 
   When `src/engine.py` has a scenario function, message Lane 4 with its name and output shape.
 - **Lane 1:** the pages and the viewer read `src/data_loader.py` directly. If `src/data.py` gains a shared clean-table
@@ -90,6 +91,9 @@ Follow-up changes:
   page inputs change. Scenario mode has no State view, so it shows Aerial (or Soil Cutaway) and returns to State when
   you switch back to History.
 - **Planner:** budget allocation removed; the page is the county scenario only.
+- **No drought prediction (Planner and the viewer's Scenario mode):** the "Predict" option is removed (the drought prediction model did not work).
+  The user picks D0-D4 and gets one estimated dollar loss instead of a low-high range: the median loss of past years at
+  that level, or the average of the nearest 3 years with a warning when fewer than 2 years match.
 
 Things to know:
 
@@ -117,5 +121,5 @@ Record the screen yourself (macOS: Shift-Command-5) following this path:
 1. Story: scroll the chapters past the pinned map.
 2. Explore 3D: Play through 2010-2013, pause on 2012, click a bar, then Soil Cutaway.
 3. State view: hover a county, then click it to fly in. Switch to Scenario.
-4. Planner: Mahaska County, corn, 2026, Predict, then D3.
+4. Planner: Mahaska County, corn, 2026, D2, then D3.
 5. Evidence.
