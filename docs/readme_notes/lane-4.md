@@ -23,7 +23,7 @@ Branch: `lane-4-app`. Files owned: `app.py`, `web/render3d.py`, `web/ui.py`, `we
   - Counties ranked by expected annual loss, never by average `yield_anomaly_pct`.
   - Drought and cost charts by year.
   - A Visualize button that opens the viewer in Mode 1.
-- **Overview, Method and data, Credits** pages. Method and data automatically shows CSV and PNG files saved in
+- **Evidence** tab (formerly Method and data, with the credits). Method and data automatically shows CSV and PNG files saved in
   `analysis/validation/results/`, and uses `docs/coverage.csv` if Lane 1 saves it.
 - **Caching:** `st.cache_data` on the county tables and the viewer payload. The first load of a page takes about 4 s, and later loads are instant.
 
@@ -38,27 +38,66 @@ Branch: `lane-4-app`. Files owned: `app.py`, `web/render3d.py`, `web/ui.py`, `we
 
 ## Handoffs
 
-- **Lane 3 (Scenarios page):** the 3D sandbox is ready. To add it to `web/pages/3_scenarios.py`:
+- **Lane 3:** the Scenarios and Budget allocation pages are superseded by the **Planner** tab (`web/pages/3_planner.py`).
+  Your files stay on disk, unregistered, so nothing you wrote is lost. Step 2 of the Planner calls
+  `src/allocation.py: allocate(losses, fund, rule, trigger, minimum_share)` as soon as it exists, following the
+  interface in the team to-do list:
+  - Input: a DataFrame with `fips`, `county`, `expected_loss`.
+  - Output: a table with `county`, `expected_loss`, `amount`, `reason`.
 
-  ```python
-  from web.render3d import showViewer
-  showViewer("sandbox", "19123")   # county FIPS as text
-  ```
-
-  The sandbox has its own inputs in the side panel: county, crop, year 2000-2030 (2026-2030 labeled projected),
-  drought level D0-D4, Predict for projected years, and price.
-- **Lane 2 (engine):** the sandbox currently runs a prototype lookup in the browser:
+  Until then it shows "Not available yet" and no amounts. The rule and trigger labels it passes are
+  "Proportional to expected loss", "Equal split", "Trigger only", "Tiered", "Weeks in D2+" and
+  "Expected loss above a threshold".
+- **Lane 2 (engine):** the Planner and the viewer's Scenario mode use one prototype lookup, `web/scenario_lookup.py`
+  (Python) and `runEngine` in the viewer (JavaScript). Both read the same county records, so they show identical numbers:
   - It takes past years whose Aug 15 drought level matches the input, and reports their median loss and min-max range.
   - It falls back to the nearest 3 years with a warning when there are fewer than 2 matches or the input is out of range.
   - "Predict" weights each level by its 2000-2025 frequency.
 
-  When `src/engine.py` has the scenario function, the sandbox numbers should come from it. Message Lane 4 with the function
-  name and output shape, and Lane 4 will pass its results into the viewer.
-- **Lane 1:** the County risk page and the viewer read `src/data_loader.py` directly. If `src/data.py` gains a
-  shared clean-table function, Lane 4 will switch to it.
-- **Docs owner:** `docs/ARCHITECTURE_OVERVIEW.md` and `docs/PROJECT_SCOPE.md` still describe `web/render3d.py`
-  as "not implemented" and say maps need a satellite basemap. The team's architecture doc chose a three.js
-  map that works offline instead. Please update those rows, or tell Lane 4 if a satellite basemap is still required.
+  When `src/engine.py` has a scenario function, message Lane 4 with its name and output shape.
+- **Lane 1:** the pages and the viewer read `src/data_loader.py` directly. If `src/data.py` gains a shared clean-table
+  function, Lane 4 will switch to it.
+- **Docs owner:** `docs/ARCHITECTURE_OVERVIEW.md` and `docs/PROJECT_SCOPE.md` still describe `web/render3d.py` as
+  "not implemented" and list six pages. Please update them for the four tabs.
+
+## Layout pass (branch `lane-4-layout`)
+
+What changed:
+
+- **Navigation:** four tabs in a top bar (Story, Explore 3D, Planner, Evidence) with pill styling, the brand mark and
+  name on the left, and "Iowa · corn · Aug 15 decision" on the right. The sidebar starts collapsed and keeps its caption.
+  Tabs have short URLs (`/explore`, `/planner`, `/evidence`).
+- **Tokens:** the "dusk field" colors, drought ramp and pill shapes live in `.streamlit/config.toml` and one CSS injector
+  (`web/ui.py: applyStyle`). The existing motion is kept and switched off under reduced motion.
+- **Fonts:** Bricolage Grotesque, DM Sans and JetBrains Mono are bundled in `static/fonts/` (SIL OFL) and served by
+  Streamlit (`enableStaticServing`), so no network is needed. Each font stack has a system fallback.
+- **Story:**
+  - The dusk hero is drawn in SVG inside its own frame. The two CTAs are real `st.page_link`s pulled up over the hero.
+  - Below it: the stats row, three chapters, the drought map, the evidence band and the footer.
+  - **The sticky pin worked:** the map column stays in view while the chapters scroll (checked at 1440x900). It only
+    applies at 900px and wider; on phones the columns stack.
+- **Explore 3D:**
+  - The viewer is inline at full width: a 586px canvas with the year card under it and a 360px panel beside it.
+  - The slider is sized so its thumb sits under each bar's center. Measured offsets were 0.0px at 1440 and at 390 wide.
+  - Play now stops at 2025 instead of looping.
+  - The old Visualize button is gone. A card's "Open in 3D" button loads that county into the viewer.
+- **Planner:** step 1 uses `web/scenario_lookup.py`; step 2 is pending (see Handoffs).
+- **Evidence:** the Method and data content, then the credits (`web/credits.py`).
+
+Things to know:
+
+- **"None" color:** the drought ramp has no color for "no drought" (it starts at D0), so "None" uses a muted sage `#5E7F6B`.
+  "No data" is `#2A333C`.
+- **Hero frame:** the spec asked for `components.html`. This Streamlit version marks it deprecated, so the hero and the viewer
+  use `st.iframe`, which does the same thing.
+- **Phone navigation:** at phone width Streamlit folds the top tabs into its menu button (the » icon). This is Streamlit's
+  own behavior.
+- **Explore 3D on phones:** the viewer frame has a fixed height, so the side panel scrolls inside the frame below the year card.
+- **Evidence band:** the cards read `analysis/validation/results/` and `docs/coverage.csv`, which don't exist, so they show
+  "Not validated yet". Lane 2's tested results are in `app/model/results/` (test_report.md, validation_report.md). That
+  model predicts **insurance payouts**, not the crop-value loss this app shows, so I did not wire its numbers into the
+  evidence band or the Planner. Decide with Lane 2 whether and how to present them.
+- **Decision label:** "Iowa · corn" in the top bar matches the default view, but the app covers four states and four crops.
 
 ## Higgsfield
 
@@ -68,10 +107,8 @@ Not generated: the free plan blocks generation (see `web/assets/PROMPTS.md`). Th
 
 Record the screen yourself (macOS: Shift-Command-5) following this path:
 
-1. Overview.
-2. County risk: the top cards, then pick Mahaska County.
-3. Visualize: Play through 2010-2013, pause on 2012, then Soil Cutaway.
-4. State view: hover a county, then click it to fly in.
-5. Scenarios (once Lane 3 adds the sandbox): set year 2026, choose Predict, then D3.
-6. Budget allocation.
-7. Method and data.
+1. Story: scroll the chapters past the pinned map.
+2. Explore 3D: Play through 2010-2013, pause on 2012, click a bar, then Soil Cutaway.
+3. State view: hover a county, then click it to fly in. Switch to Scenario.
+4. Planner: Mahaska County, corn, 2026, Predict, then D3.
+5. Evidence.

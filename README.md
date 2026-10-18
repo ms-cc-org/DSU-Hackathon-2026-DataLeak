@@ -19,20 +19,22 @@ python -m streamlit run app.py
 
 The app opens at http://localhost:8501. No API keys and no network are needed at run time: all data is in `data/`, and three.js is bundled in `web/assets/viewer/vendor/`.
 
-### Pages
+### Tabs
 
-| Page | What it shows | Status |
+The app has four tabs in a top bar.
+
+| Tab | What it shows | Where the numbers come from |
 |---|---|---|
-| Overview | An animated banner (drawn in code), count-up dataset stats, an animated 2000-2025 drought map of all 253 counties, the user, the decision, how to use the site | Done |
-| County risk (Mode 1) | State and crop selectors, ranked county cards (exposure, vulnerability, expected loss), drought and cost charts by year, and a **Visualize** button that opens the 3D viewer: a county diorama with a 2000-2025 year slider, a soil cutaway, and an extruded map of all four states (253 counties) | Done |
-| Scenarios (Mode 2) | Expected loss for a county, crop, year up to 2030 and drought level | Lane 3 page; the 3D sandbox is ready in `web/render3d.py` |
-| Budget allocation | Fund split under a chosen rule and trigger | Lane 3 |
-| Method and data | Filters, missing values, definitions, coverage, backtest results, limits | Done; backtest results appear once saved |
-| Credits | Data sources, software, AI use | Done |
+| **Story** | A dusk landscape hero (drawn in code), count-up dataset stats, three numbered chapters on the method beside an animated 2000-2025 drought map of all 253 counties (pinned while the chapters scroll), and an evidence band | Dataset counts and weekly Drought Monitor maps; the evidence cards show "Not validated yet" until results are saved in `analysis/validation/results/` and `docs/coverage.csv` |
+| **Explore 3D** | The 3D viewer inline: a county diorama with a year card (Play, one drought-colored bar per year, a slider aligned under the bars), an extruded map of all four states, a side panel with History and Scenario modes; below it, counties ranked by expected annual loss with "Open in 3D" buttons and yearly charts | History: the 2000-2025 records. Scenario: the prototype lookup |
+| **Planner** | Step 1: a county scenario for 2026-2030 (drought level D0-D4 or Predict) with a dollar range, loss %, level probabilities and the closest past years. Step 2: allocation controls | Step 1: prototype lookup (`web/scenario_lookup.py`), not a validated model. Step 2: shows "Not available yet" until `src/allocation.py` has an allocation function |
+| **Evidence** | Filters, definitions, coverage, backtest results when saved, limits, then the credits | Records and saved results |
+
+`web/pages/3_scenarios.py`, `4_budget_allocation.py` and `6_credits.py` stay on disk for teammates but are not registered as tabs.
 
 ### AI-use disclosure
 
-- **Claude Code (Anthropic)** helped write the 3D viewer (`web/assets/viewer/viewer.html`, `web/render3d.py`), the County risk, Overview, Method and data, and Credits pages, the theme and animations (`web/ui.py`, `.streamlit/config.toml`), and this README. How we verified it:
+- **Claude Code (Anthropic)** helped write the 3D viewer (`web/assets/viewer/viewer.html`, `web/render3d.py`), the Story, Explore 3D, Planner and Evidence tabs, the prototype scenario lookup (`web/scenario_lookup.py`), the theme and animations (`web/ui.py`, `.streamlit/config.toml`), and this README. How we verified it:
   - We ran every page and checked numbers against the master table. For example, Mahaska County corn 2012 shows 133.0 bu/acre, 25.0% below trend, and a D3 drought level.
   - We confirmed that years with no reported yield show "No data", never zero.
   - We checked that the viewer loads with no console errors and holds 60 fps on an Apple M2 laptop, including the all-states map.
@@ -300,20 +302,24 @@ If you want a question to explore before choosing a user:
 
 ```
 app.py                          Streamlit page navigation — run with: python -m streamlit run app.py
-.streamlit/config.toml          dark theme that matches the 3D viewer
+.streamlit/config.toml          "dusk field" theme tokens and bundled font faces
+static/fonts/                   Bricolage Grotesque, DM Sans, JetBrains Mono (SIL OFL), served by Streamlit
 LICENSE                         MIT license for the code and docs (data credits in README)
 requirements.txt                pinned dependencies (app, notebook, modelling)
 .env.example                    provider configuration template (no real keys)
 
 web/
-├── pages/                      six project pages, Overview through Credits
+├── pages/                      the four tabs (1_overview = Story, 2_county_risk = Explore 3D, 3_planner = Planner,
+│                               5_method_and_data = Evidence) plus three superseded pages kept for teammates
 ├── assets/
 │   ├── viewer/viewer.html      the three.js 3D viewer (procedural; no model files)
 │   ├── viewer/vendor/          three.js r169, bundled so the app works offline (MIT)
 │   ├── media/                  optional decorative media (none yet)
 │   └── PROMPTS.md              prompts and status for generated media
-├── ui.py                       shared labels, theme motion, animated banner and stats, assets with fallback
-└── render3d.py                 county records for the viewer and the County risk page; embeds the viewer
+├── ui.py                       design tokens, shared CSS, Story hero, stats, pending state, assets with fallback
+├── credits.py                  credits text shown on the Evidence tab
+├── scenario_lookup.py          prototype scenario lookup (same numbers as the viewer's Scenario mode)
+└── render3d.py                 county records for the viewer and the Explore 3D tab; embeds the viewer
 
 data/
 ├── master_dataset.csv          the dataset (2.3 MB)
