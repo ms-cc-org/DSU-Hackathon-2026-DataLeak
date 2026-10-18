@@ -27,8 +27,14 @@ currentPage = st.navigation(
     position="top",
 )
 
+
 brand = Path(__file__).resolve().parent / "web" / "assets" / "brand.svg"
 if brand.exists():
     st.logo(str(brand), size="large")
 applyStyle()  # shared tokens and motion for every page (style only; takes no space)
+applyStyle()  # shared theme motion for every page (style only; takes no space)
+st.sidebar.caption(
+    "August 15 decision. Scenario X is estimated insurance payouts; Y is deductible exposure; Z is illustrative 95% relief."
+)
+
 currentPage.run()

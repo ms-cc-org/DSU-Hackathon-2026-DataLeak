@@ -54,6 +54,14 @@ def growingSeasonDrought() -> pd.DataFrame:
 def chapter(number: str, headline: str, copy: str) -> None:
     st.html(f'<div class="drChapter"><div class="drChapterNum">{number}</div><h3>{headline}</h3><p>{copy}</p></div>')
 
+**The decision:** on **August 15**, how to split a fixed relief fund across counties, using what is
+known about the season by that date.
+
+**What the tool shows:** retrospective county drought and yield history, plus an Iowa-corn
+historical-footprint scenario. Its headline X is estimated drought insurance payouts, while
+Y is estimated deductible exposure and Z is an illustrative 95% relief amount.
+"""
+)
 
 def droughtMap() -> None:
     """The animated 2000-2025 drought map with its state switch (real weekly Drought Monitor data)."""
@@ -78,6 +86,7 @@ def droughtMap() -> None:
         hover_data={"level": True, "meaning": True, "fips": False, "severity": False},
         color_continuous_scale=steps, range_color=[-0.5, 5.5], labels={"level": "Worst level", "meaning": "Meaning"},
     )
+
     fig.update_geos(fitbounds="locations", visible=False, projection_type="mercator", bgcolor="rgba(0,0,0,0)")
     fig.update_traces(marker_line_width=0.4, marker_line_color=GROUND)
     fig.update_layout(height=470, margin=dict(l=0, r=0, t=10, b=0), paper_bgcolor="rgba(0,0,0,0)",
@@ -111,6 +120,30 @@ if not showVideo("intro_loop.mp4", caption="Illustrative animation (AI-generated
             st.page_link("web/pages/2_county_risk.py", label="Explore in 3D", icon=":material/view_in_ar:")
         with st.container(key="ctasecondary", width="content"):
             st.page_link("web/pages/3_planner.py", label="Open the planner", icon=":material/tune:")
+=======
+    droughtMap.update_geos(fitbounds="locations", visible=False, projection_type="mercator", bgcolor="rgba(0,0,0,0)")
+    droughtMap.update_traces(marker_line_width=0.3, marker_line_color="#10151b")
+    droughtMap.update_layout(height=460, margin=dict(l=0, r=0, t=10, b=0), paper_bgcolor="rgba(0,0,0,0)",
+                             coloraxis_colorbar=dict(title="Worst level", tickvals=list(range(6)), ticktext=DROUGHT_LABELS))
+    droughtMap.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"] = 650
+    droughtMap.layout.updatemenus[0].buttons[0].args[1]["transition"]["duration"] = 250
+    st.plotly_chart(droughtMap, width="stretch")
+except Exception as error:
+    st.warning(f"The drought map could not be drawn: {error}")
+
+st.subheader("How to use this site")
+st.markdown(
+    """
+1. **County risk** - ranked county cards for any of the four states and crops, each county's drought and
+   loss history, and a 3D view with a 2000-2025 year slider and a map of all four states. Real records only.
+2. **Scenarios** - combine a base year's insured exposure with another year's August 15 drought
+   and weather footprint for Iowa corn. Compare X, Y, Z and the closest historical years.
+3. **Budget allocation** - allocation rules are still being built by Lane 3.
+4. **Method and data** - how the numbers are made, what is filtered out, and the limits.
+5. **Credits** - data sources, tools, and how AI was used.
+"""
+)
+
 
 try:
     counts = datasetCounts()

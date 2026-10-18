@@ -1,17 +1,19 @@
 # Architecture overview
 
-This document describes the **current repository layout** after grouping related files. The root `app.py` remains the launch command; the running Overview reads supplied data, while the feature, prediction, allocation, validation, and satellite-map paths are still scaffolds.
+This document describes the **current repository layout** after grouping related files. The root `app.py` remains the launch command; the Overview reads supplied data, and the Scenario page calls Lane 2's offline-fitted prediction engine. The allocation page and satellite map still need wiring.
 
 ## How the pieces connect
 
 ```text
 app.py → web/pages/ → src/data.py → src/data_loader.py → data/
-                         planned: src/features.py → src/engine.py → src/allocation.py
-                         evidence: analysis/validation/ and analysis/models/
-                         display: web/render3d.py → web/pages/
+                    → src/engine.py → app/model/artifacts/ ← app/model/build_artifacts.py
+                                               ↑                    ↑
+                                        app/model/ models   usda_budget_data/ + source panels
+                    → src/allocation.py (Lane 3 boundary)
+                    → web/render3d.py (map boundary)
 ```
 
-`data/processed/` contains supplied source panels, and `data/derived/` is reserved for new feature tables. `analysis/` holds exploratory notebooks and future model/validation artifacts; `web/` owns everything used to present the tool.
+`data/processed/` contains supplied source panels, and `data/derived/` is reserved for new feature tables. `usda_budget_data/` contains prepared RMA insurance model rows. `app/model/` owns the current model research, saved artifacts, and official test reports; `web/` owns presentation.
 
 ## Root and submission
 
@@ -36,9 +38,9 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 | `web/pages/` | Holds the six page scripts registered by `app.py`. Pages are organized in navigation order. |
 | `web/pages/1_overview.py` | Displays project context, counts, and a descriptive chart from reported Iowa corn yields. It does not produce a loss prediction. |
 | `web/pages/2_county_risk.py` | Reserves the historical county-risk view and a future satellite county map. It currently labels the unfinished view. |
-| `web/pages/3_scenarios.py` | Reserves the hypothetical drought, acreage, and corn-price workflow. It currently shows no model estimate. |
+| `web/pages/3_scenarios.py` | Runs Iowa-corn historical-footprint scenarios through `src.engine` and displays statewide X/Y/Z, county estimates, a rough range, and analog years. |
 | `web/pages/4_budget_allocation.py` | Reserves statewide funding and county-allocation comparisons. It currently shows no calculated payment or recommendation. |
-| `web/pages/5_method_and_data.py` | Explains the proposed August 15 data cutoff and separates crop-value loss from insurance and relief payments. It explicitly says that no backtest result exists yet. |
+| `web/pages/5_method_and_data.py` | Explains the August 15 data cutoff and model limitations. Its old placeholders need Lane 4 wording updates to display the new RMA test results. |
 | `web/pages/6_credits.py` | Lists the starter data sources and placeholders for later imagery, price, RMA, team, and AI credits. It must be completed as those sources are added. |
 | `web/pages/README.md` | Describes what the six pages currently do and which results remain pending. |
 | `web/ui.py` | Provides the shared `showPending` message used by unfinished pages. It keeps placeholder wording consistent. |
@@ -51,11 +53,11 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 
 | File or folder | Purpose |
 |---|---|
-| `src/` | Holds data access and future analytical logic, separate from Streamlit pages. The app currently calls only the Iowa corn history filter. |
+| `src/` | Holds data access and app-facing analytical logic, separate from Streamlit pages. Overview uses the Iowa corn history filter, and Scenarios calls the cached Lane 2 engine. |
 | `src/data_loader.py` | Loads the supplied master table, source panels, and county GeoJSON from stable repository paths. These are organizer-provided helpers. |
 | `src/data.py` | Filters the master table to Iowa corn while retaining missing-yield records and five-character FIPS. Overview uses this module for real descriptive data. |
 | `src/features.py` | Reserves construction of drought/weather/soil features known by August 15. No derived feature table has been built. |
-| `src/engine.py` | Reserves yield-trend, loss-model, historical-analog, and scenario-dollar logic. No model exists in this module yet. |
+| `src/engine.py` | Loads fitted D/C artifacts once and exposes stable `predict`, `scenario`, and `replay` contracts for insured payout and budget illustrations. |
 | `src/allocation.py` | Reserves funding-need and county-allocation policy rules. It remains empty until the relief policy is defined. |
 | `src/build/` | Holds organizer scripts that collected, joined, and checked the supplied dataset. They are reference/pipeline code, not required for the app's current read path. |
 | `src/build/NASS_data_pull.py` | Pulls USDA NASS crop yield and acreage records for the source dataset. |
@@ -101,10 +103,33 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 | `analysis/` | Groups exploratory notebooks with future saved models and validation outputs. It keeps research artifacts separate from the app and supplied data. |
 | `analysis/notebooks/` | Holds exploratory notebooks; moving it here does not change the app's data path. |
 | `analysis/notebooks/starter_notebook.ipynb` | Walks through a starter Iowa drought analysis and example county map. Its import path points back to the repository root. |
-| `analysis/models/` | Reserves a location for documented trained models. There is no model artifact yet. |
+| `analysis/models/` | An older reserved location for documented trained models. Current Lane 2 artifacts live in `app/model/artifacts/`. |
 | `analysis/models/README.md` | Lists the training, version, and evidence details that should accompany a saved model. |
-| `analysis/validation/` | Reserves walk-forward backtest code and results. It is separate from the interactive demo. |
+| `analysis/validation/` | An older reserved validation location. Current RMA model results live in `app/model/results/`. |
 | `analysis/validation/README.md` | States the August 15 cutoff, earlier-year training, baseline, and sample-count requirements for future validation. |
+
+## RMA model and verification
+
+| File or folder | Purpose |
+|---|---|
+| `organize_usda_data.py` | Builds August 15 county model inputs and RMA insurance labels in training, validation, and testing splits. |
+| `usda_budget_data/` | Holds prepared Iowa/Nebraska corn/soybean RMA inputs and labels. `testing/` is intentionally ignored; the official test predictions remain under `app/model/results/`. |
+| `usda_budget_data/DATA_README.md` | Defines split years, decision-time fields, RMA labels, and X/Y/Z interpretation. |
+| `usda_budget_data/manifest.json` | Records source-year availability and split row counts. |
+| `app/model/` | Owns model fitting, baselines, evaluation, budget math, artifacts, and reports. Its files are script-style modules rather than a Python package. |
+| `app/model/data.py` | Defines feature order, target names, dataset loading, filters, and fold-fitted preprocessing. |
+| `app/model/tweedie.py` | Implements current model D for T1 payout share and T2 damaged-acre share. |
+| `app/model/analog.py` | Implements model C's nearest historical county-year pool and quantile spread. |
+| `app/model/baselines.py`, `erp.py` | Implement zero, drought-bin, liability, and USDA-style eligibility-trigger comparisons. |
+| `app/model/hurdle.py`, `gbm.py`, `tabpfn_model.py` | Implement other evaluated model candidates or experiments. |
+| `app/model/evaluate.py`, `final_test.py`, `deploy_check.py` | Produce walk-forward/validation results, the held-out official test, and deployment diagnostics. |
+| `app/model/budget.py` | Converts predicted shares to X/Y/Z and computes C-based historical ranges, calibration helpers, and range flags. |
+| `app/model/build_artifacts.py` | Fits and saves D and C outside the app request path, rebuilding ignored testing inputs when necessary and verifying D against saved official predictions. |
+| `app/model/iowa_corn_slice.py` | Calculates an Iowa-corn-only comparison from existing official-test predictions, without refitting. |
+| `app/model/artifacts/` | Stores the 2000–2015 test and 2000–2025 full model bundles, prebuilt inference inputs, and the artifact build report. |
+| `app/model/results/` | Holds the existing model evaluation, official-test predictions/reports, the regenerated state-year reference, and the Iowa-corn slice. |
+| `app/model/README.md`, `DECISIONS.md` | Explain model design, data boundaries, evaluation protocol, and the decision history. |
+| `tests/test_engine.py` | Checks artifact reproduction, scenario nonnegativity, out-of-range flags, and dollar scaling using standard-library unittest. |
 
 ## Documentation and local planning
 
@@ -113,6 +138,7 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 | `docs/` | Holds public project scope, this architecture record, event guidance, and data specifications. Its `dev/` subfolder is local-only. |
 | `docs/ARCHITECTURE_OVERVIEW.md` | Explains each folder and file in the grouped repository, plus the current/planned data flow. |
 | `docs/PROJECT_SCOPE.md` | Tracks the ultimate goal, confirmed decisions, core moving parts, current state, and open decisions. |
+| `docs/lane2_contract.md` | Specifies the fitted artifacts, prediction function signatures, output units, scenario semantics, and handoff to Lane 3. |
 | `docs/dataset_specification.md` | Gives the organizer's formal master-data fields, filters, units, and validation checks. |
 | `docs/technical_implementation_plan.md` | Explains the organizer's dataset design, source choices, pipeline, and event mechanics. |
 | `docs/Data to Harvest Hackathon at Delaware State University.md` | Preserves the longer event concept, including proposed challenge context. The current student briefing is the stronger source for submission details. |
