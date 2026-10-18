@@ -1,0 +1,27 @@
+fips,county_name,state_alpha,crop,year,rma_year_available,insured,liability,insured_acres,avg_coverage,drought_indemnity,heat_indemnity,other_indemnity,drought_loss_acres,drought_payout_share,drought_payout_per_acre,drought_loss_acre_share,full_crop_value,out_of_pocket_drought_loss,est_drought_damage,est_drought_loss_share,relief_gap_to_95pct,yield_per_acre,yield_status,yield_drop_vs_prev5_pct,possible_out_of_pocket_loss
+31117,McPherson County,NE,CORN,2000,True,,,,,,,,,,,,,,,,,136.0,reported,,False
+31117,McPherson County,NE,CORN,2001,True,,,,,,,,,,,,,,,,,150.0,reported,,False
+31117,McPherson County,NE,CORN,2002,True,,,,,,,,,,,,,,,,,146.0,reported,,False
+31117,McPherson County,NE,CORN,2003,True,,,,,,,,,,,,,,,,,82.0,reported,43.05555555555556,False
+31117,McPherson County,NE,CORN,2004,True,,,,,,,,,,,,,,,,,174.1,reported,-35.486381322957186,False
+31117,McPherson County,NE,CORN,2005,True,,,,,,,,,,,,,,,,,188.0,reported,-36.60805115535533,False
+31117,McPherson County,NE,CORN,2006,True,,,,,,,,,,,,,,,,,177.0,reported,-19.578435346574775,False
+31117,McPherson County,NE,CORN,2007,True,,,,,,,,,,,,,,,,,161.1,reported,-5.005866249511137,False
+31117,McPherson County,NE,CORN,2008,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,CORN,2009,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,CORN,2010,True,True,2244079.0,5269.0,0.6899040564197487,0.0,0.0,12448.0,0.0,0.0,0.0,0.0,3252740.6950549455,0.0,0.0,0.0,0.0,,not_reported,,False
+31117,McPherson County,NE,CORN,2011,True,True,4650628.0,7279.0,0.7142753223990697,0.0,0.0,11067.0,0.0,0.0,0.0,0.0,6510973.9258241765,0.0,0.0,0.0,0.0,189.0,reported,,False
+31117,McPherson County,NE,CORN,2012,True,True,3521812.0,5862.0,0.695376822212738,52226.0,0.0,133186.0,176.5,0.014829298099955365,8.909245991129307,0.030109177755032412,5064609.413919414,46452.361575703966,98678.36157570397,0.019483903596691866,38827.800320528455,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2000,True,,,,,,,,,,,,,,,,,35.6,reported,,False
+31117,McPherson County,NE,SOYBEANS,2001,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2002,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2003,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2004,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2005,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2006,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2007,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2008,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2009,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2010,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2011,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2012,True,True,527537.0,1079.0,0.6886311284624946,0.0,31152.0,22306.0,0.0,0.0,0.0,0.0,766066.1538461539,0.0,0.0,0.0,0.0,,not_reported,,False

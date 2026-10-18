@@ -17,3 +17,6 @@ suggestions.md
 .env.*
 !.env.example
 .streamlit/secrets.toml
+# model data: testing/ is the held-out set and must never be committed
+usda_budget_data/testing/
+app/usda_budget_data/
