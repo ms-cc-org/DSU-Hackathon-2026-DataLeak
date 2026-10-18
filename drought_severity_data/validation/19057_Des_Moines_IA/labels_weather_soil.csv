@@ -1,0 +1,4 @@
+fips,county_name,state_alpha,year,y_B,y_B_name,worse_B,change_B,weeks_d2plus_to_cutoff,n_input_maps,last_input_map_date
+19057,Des Moines County,IA,2013,1,D0,1,1,0,20,2013-08-13
+19057,Des Moines County,IA,2014,2,D1,1,1,0,20,2014-08-12
+19057,Des Moines County,IA,2015,1,D0,0,0,0,19,2015-08-11

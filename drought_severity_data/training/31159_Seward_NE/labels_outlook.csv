@@ -1,0 +1,14 @@
+fips,county_name,state_alpha,year,y_A,y_A_name,worse_A,change_A,n_outlook_maps,last_outlook_map_date
+31159,Seward County,NE,2000,3,D2,1,2,7,2000-09-26
+31159,Seward County,NE,2001,2,D1,1,1,7,2001-09-25
+31159,Seward County,NE,2002,4,D3,0,0,6,2002-09-24
+31159,Seward County,NE,2003,3,D2,0,0,7,2003-09-30
+31159,Seward County,NE,2004,2,D1,1,1,7,2004-09-28
+31159,Seward County,NE,2005,2,D1,0,0,7,2005-09-27
+31159,Seward County,NE,2006,3,D2,0,0,7,2006-09-26
+31159,Seward County,NE,2007,0,None,0,-1,7,2007-09-25
+31159,Seward County,NE,2008,2,D1,1,2,7,2008-09-30
+31159,Seward County,NE,2009,2,D1,0,0,7,2009-09-29
+31159,Seward County,NE,2010,1,D0,1,1,7,2010-09-28
+31159,Seward County,NE,2011,0,None,0,-1,7,2011-09-27
+31159,Seward County,NE,2012,4,D3,0,0,7,2012-09-25

@@ -1,0 +1,14 @@
+fips,county_name,state_alpha,year,y_A,y_A_name,worse_A,change_A,n_outlook_maps,last_outlook_map_date
+19165,Shelby County,IA,2000,3,D2,1,1,7,2000-09-26
+19165,Shelby County,IA,2001,2,D1,1,1,7,2001-09-25
+19165,Shelby County,IA,2002,1,D0,0,0,6,2002-09-24
+19165,Shelby County,IA,2003,4,D3,1,3,7,2003-09-30
+19165,Shelby County,IA,2004,0,None,0,0,7,2004-09-28
+19165,Shelby County,IA,2005,2,D1,1,1,7,2005-09-27
+19165,Shelby County,IA,2006,2,D1,0,0,7,2006-09-26
+19165,Shelby County,IA,2007,1,D0,0,-1,7,2007-09-25
+19165,Shelby County,IA,2008,1,D0,1,1,7,2008-09-30
+19165,Shelby County,IA,2009,0,None,0,0,7,2009-09-29
+19165,Shelby County,IA,2010,0,None,0,0,7,2010-09-28
+19165,Shelby County,IA,2011,0,None,0,0,7,2011-09-27
+19165,Shelby County,IA,2012,4,D3,0,0,7,2012-09-25

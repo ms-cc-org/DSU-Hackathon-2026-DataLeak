@@ -1,0 +1,4 @@
+fips,county_name,state_alpha,year,y_B,y_B_name,worse_B,change_B,weeks_d2plus_to_cutoff,n_input_maps,last_input_map_date
+31105,Kimball County,NE,2013,5,D4,0,0,20,20,2013-08-13
+31105,Kimball County,NE,2014,2,D1,1,2,0,20,2014-08-12
+31105,Kimball County,NE,2015,1,D0,0,0,0,19,2015-08-11

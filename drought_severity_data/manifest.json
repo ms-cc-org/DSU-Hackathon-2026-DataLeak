@@ -1,0 +1,141 @@
+{
+  "built": "2026-10-18T03:12:39",
+  "max_year_loaded": 2015,
+  "level_threshold_pct": 1.0,
+  "input_window": [
+    "04-01",
+    "08-13"
+  ],
+  "outlook_label_window": [
+    "08-14",
+    "09-30"
+  ],
+  "task_a_input_columns": [
+    "level_last_map",
+    "dsci_last",
+    "d0plus_pct_last",
+    "d1plus_pct_last",
+    "dsci_change_4wk",
+    "level_apr1",
+    "prev_fall_level",
+    "nbr_level_last",
+    "precip_30d",
+    "precip_60d",
+    "precip_90d",
+    "precip_apr1_to_cutoff",
+    "winter_precip",
+    "tmax_mean_30d",
+    "heat32_days_apr1_to_cutoff",
+    "dry_days_30d",
+    "wb_30d",
+    "wb_90d",
+    "wb_apr1",
+    "precip_30d_ratio",
+    "precip_60d_ratio",
+    "precip_90d_ratio",
+    "precip_apr1_to_cutoff_ratio",
+    "winter_precip_ratio",
+    "aws_100cm_mm",
+    "droughty_pct",
+    "irr_share",
+    "is_nebraska"
+  ],
+  "task_b_input_columns": [
+    "level_apr1",
+    "prev_fall_level",
+    "precip_30d",
+    "precip_60d",
+    "precip_90d",
+    "precip_apr1_to_cutoff",
+    "winter_precip",
+    "tmax_mean_30d",
+    "heat32_days_apr1_to_cutoff",
+    "dry_days_30d",
+    "wb_30d",
+    "wb_90d",
+    "wb_apr1",
+    "precip_30d_ratio",
+    "precip_60d_ratio",
+    "precip_90d_ratio",
+    "precip_apr1_to_cutoff_ratio",
+    "winter_precip_ratio",
+    "aws_100cm_mm",
+    "droughty_pct",
+    "irr_share",
+    "is_nebraska"
+  ],
+  "splits": {
+    "training": {
+      "years": [
+        2000,
+        2012
+      ],
+      "rows": 2496,
+      "task_A": {
+        "rows": 2496,
+        "persistence_exact_accuracy": 0.577,
+        "persistence_within_one_level": 0.91,
+        "worse_rate": 0.345,
+        "label_distribution": {
+          "None": 724,
+          "D0": 635,
+          "D1": 401,
+          "D2": 350,
+          "D3": 277,
+          "D4": 109
+        }
+      },
+      "task_B": {
+        "rows": 2496,
+        "persistence_exact_accuracy": 0.523,
+        "persistence_within_one_level": 0.803,
+        "worse_rate": 0.451,
+        "label_distribution": {
+          "None": 596,
+          "D0": 668,
+          "D1": 329,
+          "D2": 453,
+          "D3": 387,
+          "D4": 63
+        }
+      },
+      "counties": 192
+    },
+    "validation": {
+      "years": [
+        2013,
+        2015
+      ],
+      "rows": 576,
+      "task_A": {
+        "rows": 576,
+        "persistence_exact_accuracy": 0.639,
+        "persistence_within_one_level": 0.936,
+        "worse_rate": 0.321,
+        "label_distribution": {
+          "None": 238,
+          "D0": 144,
+          "D1": 66,
+          "D2": 91,
+          "D3": 34,
+          "D4": 3
+        }
+      },
+      "task_B": {
+        "rows": 576,
+        "persistence_exact_accuracy": 0.878,
+        "persistence_within_one_level": 0.995,
+        "worse_rate": 0.12,
+        "label_distribution": {
+          "None": 55,
+          "D0": 130,
+          "D1": 184,
+          "D2": 72,
+          "D3": 65,
+          "D4": 70
+        }
+      },
+      "counties": 192
+    }
+  }
+}

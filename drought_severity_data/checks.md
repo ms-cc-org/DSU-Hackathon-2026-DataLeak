@@ -1,0 +1,29 @@
+# Checks
+
+- **PASS** weekly drought categories are non-overlapping (none + D0..D4 sum to ~100%)
+- **PASS** drought maps loaded only for 2000-2015
+- **PASS** every Task A map input (level_last_map, dsci_last, d0/d1 share, dsci_change_4wk) comes from a map dated <= 08-13
+- **PASS** outlook-label maps all start on/after 08-14 (after every input map)
+- **PASS** level_apr1 uses maps dated <= 04-07 only (latest map date used: 04-07), so Task B sees no map after Apr 7
+- **PASS** prev_fall_level uses maps from the PREVIOUS calendar year only (all dated before Jan 1 of the decision year)
+- **PASS** every weather window ends <= Aug 13 of its year (latest in-season month-day used: 813; winter window ends Mar 31)
+- neighbors: 0-11 other counties within 70 km per county (median 8)
+- **PASS** Task A inputs contain no label columns
+- **PASS** Task B inputs contain no label columns
+- **PASS** Task B inputs contain only the two allowed map-derived columns ['level_apr1', 'prev_fall_level'] (found: ['level_apr1', 'prev_fall_level']); both use maps dated <= Apr 7 of the year or before Jan 1
+- **PASS** Task A inputs contain the map-state features
+- **PASS** row alignment: Task A inputs has the same county-year in every row
+- **PASS** row alignment: Task B inputs has the same county-year in every row
+- **PASS** row alignment: Task A labels has the same county-year in every row
+- **PASS** row alignment: Task B labels has the same county-year in every row
+- **PASS** one row per county x year
+- **PASS** every fips is a 5-character string
+- **PASS** no row after 2015 in any output (2016+ excluded unless the final-test flags were given)
+- **PASS** almost every county-year has >= 15 input maps (Apr 1 - Aug 13)
+- **PASS** almost every county-year has >= 6 outlook maps (Aug 14 - Sep 30)
+- **PASS** labels exist for almost every row (missing: worse_A 0.00%, worse_B 0.00%)
+- **PASS** level_last_map always comes from a map dated by 08-13
+- Task B: strongest single input vs y_B |correlation| = 0.72 (level_apr1); near 1.0 would suggest a hidden copy of the label
+- **PASS** no Task B input is a near-copy of the label
+- cross-check vs master max_drought_severity (corn, May 1 - Sep 30): 100.0% of 3040 county-years agree exactly (differences come from the master's own season window)
+- **PASS** level definition matches the repo's master dataset for > 80% of county-years
