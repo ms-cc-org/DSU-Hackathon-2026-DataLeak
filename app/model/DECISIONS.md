@@ -121,3 +121,80 @@ cannot be reproduced exactly; the final test will run all three frozen models, w
 for the ten test years; MPS is faster but not bit-reproducible). 4. Entries 1-2 and the code are still uncommitted at the time of writing.
 
 ---
+
+## Entry 3: written 2026-10-17 23:50 EDT (system clock), BEFORE any work on this revision
+
+**Entry 3: plan revised after external review and code audit. One final test on 2016–2025 after these fixes. Headline chosen by the rule below on
+walk-forward + validation only. Disclosure: some 2016–2025 years appeared in earlier exploratory analyses (2018/2022 payout totals, early 2022/2023
+budget tests). The v2 split backtests are cancelled; the new features are added before the single test.**
+
+State at writing: `final_test.py` has not been run (no `test_*` file in `results/`); nothing in this repo's evaluation has used 2016–2025 labels. Last commit a5c10b9.
+
+### What this entry replaces
+- Entry 1 A.1 (freeze G, B, D) and A.4 (deployability headline rule): replaced by item 12 below. G is not rerun; its earlier run is reported as an experiment only.
+- Entry 1 B ("Version 2") and its split backtests: cancelled. The new features go in before the single v1 test.
+- Entry 1's B2 window (maps through Aug 14): maps are now limited to those released by Aug 15, i.e. map_date <= Aug 13.
+
+### Decided by the user (2026-10-17)
+Data: (1) merge RMA county 19156 into 19155 summing at coverage-level rows before aggregation; (2) drought maps only if map_date <= Aug 13; (3) document the rain
+normal window correctly (1999-2012) and add a per-year irrigated-share column so earlier years can be averaged; (4) new features d0_pct_last_map,
+d1_pct_last_map, 4-week change in d1_pct and in dsci, 30-day precip ratio before the cutoff; rebuild, report row counts, confirm testing/ is gitignored.
+Models/evaluation: (5) fold-safe preprocessing from years < Y for each walk-forward year Y; (6) nested calibration only, kept per model only if it lowers
+statewide $ error; (7) baselines Z0 zero, B1 bin average, B2a USDA binary trigger, B2b tiered LFP-style trigger, B3 liability only, B4 liability x d2_pct_last_map,
+headline comparison vs B2a/B2b; (8) models A, B, C, D on the new features; (9) metrics overall AND drought state-years: statewide absolute $ error, $ under-budgeted,
+worst state-year shortfall, county WAPE, top-20 capture (counties, crops summed), best possible capture, calibration, for T1, T2 and Z, with one consistent AUC input,
+consistent T2 scoring, deterministic tie-breaks; (10) "historical scenario range", coverage for drought vs quiet separately plus width and upper-bound misses;
+(11) feature ablation of B, old vs new features; (12) selection rule: among A, B, C, D the lowest statewide absolute $ error on drought state-years, provided top-20 capture
+beats B3 AND B4; ties within 5% go to the simpler model; (13) wording: X = estimated insurance payouts, Y = estimated deductible exposure, Z = illustrative relief
+allocation under a 95% coverage assumption (inspired by USDA ERP 2022), Iowa 2013 = an emerging drought (D1 34% by Aug 13) that intensified after the forecast date,
+derecho removed from expected misses; (14) copy the audit's AUDIT_REPORT.md into app/model/results/; (15) final_test.py uses the widened budget range and runs as
+`python app/model/final_test.py --i-am-sure`; (16) trigger agreement analysis (significant payout = drought_payout_share >= 0.02; precision/recall for B2a and the headline model
+flagging the same number of counties per state-year; 2x2 table per split with county-year counts and actual $; highlight the two disagreement cells).
+Timebox: stop and report by 1:30 AM; ask before committing; wait for the user's go-ahead before the final test.
+
+### Interpretations fixed by Claude before running (so they cannot be tuned afterwards)
+- *Fold safety by construction.* The organizer computes each row's rain normal as the mean precip_mm of strictly earlier years (weather data from 1999; needs >= 3 earlier
+  years, else missing) and its irrigated-share average as the mean of strictly earlier NASS years; the per-year columns (precip_mm, irr_share_year) are kept. Imputers, scalers,
+  B1 bins, kNN pools and models are fitted in fit() on the fold's training rows only.
+- *New features.* d0_pct_last_map = D0+ area share (100 - none_pct) and d1_pct_last_map = D1+ area share on the last map with map_date <= Aug 13; 4-week changes = last map minus
+  the map 28 days earlier (missing if absent); precip_30d_ratio = precipitation Jul 16-Aug 14 divided by the mean of the same window in strictly earlier years (>= 3 years).
+  "Old" features for the ablation = the pre-revision column list, rebuilt with the corrected cutoffs and normals.
+- *Nested calibration.* For each scored year Y, k = sum(actual) / sum(predicted) over the out-of-sample predictions of earlier years only (walk-forward 2006-2012, then validation
+  2013-2015 as they pass); k = 1 when there are none (2006). A model-target keeps calibration only if nested-calibrated statewide absolute $ error over 2006-2015 is lower than uncalibrated.
+  In the final test k for year Y uses the 2006-2015 predictions plus the already-passed test years' predictions and realised labels.
+- *Ranges.* A, B, D: the historical scenario range resamples whole earlier years' residuals (years < Y only, at least 3 such years, else no range); C: its neighbours' spread.
+  The budget range is the best-covering method (closest to 80% pooled), widened to contain the headline model's point estimate.
+- *B2a/B2b.* B2a = the existing trigger (D2+ on any part for 8 consecutive weekly maps, or D3+ on any part), maps Apr 1 - Aug 13, share = training liability-weighted mean among triggering
+  rows per state x crop, else 0. B2b weight = the highest tier met: 1 = D2+ for 8 consecutive maps; 3 = any D3+; 4 = D3+ for 4+ consecutive maps or any D4; 5 = D4 for 4+ consecutive maps; 0 otherwise;
+  predicted $ = weight x liability x c, with c fitted on training rows as sum(actual $) / sum(weight x liability) over rows with weight > 0. B3 = constant training liability-weighted mean
+  share x liability. B4 = c x liability x d2_pct_last_map / 100 with c fitted on training rows. Z0 = 0. All then pass through the same nested-calibration decision.
+- *Metrics.* Statewide absolute $ error = mean over state-years of |sum predicted - sum actual|; $ under-budgeted = sum over state-years of max(0, actual - predicted); worst shortfall = the
+  largest single state-year max(0, actual - predicted); county WAPE = sum |error| / sum actual over county-years (crops summed); top-20 capture on counties with crops summed, ties broken by
+  county FIPS ascending (never by actual values); AUC input = the model's own predicted amount for every model (T1 for payouts, T2 for acres, Z for relief). Z = illustrative relief $ built
+  from T2 as in budget.py. A drought state-year = actual statewide drought payout >= 3% of insured $ (unchanged).
+- *Selection rule (item 12) details.* Evaluated on pooled walk-forward + validation (2006-2015) with nested-calibrated predictions: candidate error = statewide absolute $ error averaged over
+  the drought state-years in that pool; capture condition uses all pooled state-years (top-20 capture of the candidate must exceed both B3's and B4's); candidates within 5% of the lowest
+  error are tied and the simplest wins, order D < A < C < B. If no candidate meets the capture condition, the highest-capture candidate is the headline and the report says the rule was not met.
+- *Trigger agreement (item 16).* Counties flagged by B2a in a state-year = counties whose trigger is on; the model flags its top N counties of that state-year by predicted $ (crops summed, ties by FIPS),
+  N = B2a's count (0 flags none). Precision/recall are over county-crop-years (a flagged county flags both crops; "significant" = share >= 0.02 for that county-crop-year). The 2x2 tables count
+  county-years (crops summed) and sum their actual drought payouts; the favoured side of each disagreement cell is the one with the larger mean payout per county-year. The yield-loss add-on is optional.
+- *Final test.* One run, 2016-2025, after the single headline is chosen by item 12; models A, B, C, D and all baselines are reported.
+
+---
+
+## Entry 4: written 2026-10-17 23:54 EDT (system clock), before the revised evaluation was run
+
+Addendum to Entry 3. One extra audit fix is applied that Entry 3 did not list: Model A's back-transform factor changes from the Duan smearing mean of exp(residual) to the ratio
+estimator sum(w*y) / sum(w*exp(fit)) over the positive rows (audit "Should fix" 6: the old factor over-scaled the conditional amount about 2x and was hidden by k). No other model
+change. Audit items deliberately NOT changed (reported as limitations): hyper-parameters are tuned on the same walk-forward folds that are reported (7); history features act as year
+proxies in 2000-2002 (10); the 0.02 / 5% noise bands stay as fixed in Entry 3. Still true: `final_test.py` has not been run and no 2016-2025 result exists.
+
+---
+
+## Entry 5: written 2026-10-18 00:05 EDT (system clock): results of the revised evaluation (walk-forward 2006-2012 + validation 2013-2015 only)
+
+The data was rebuilt (training 4810 rows / 190 counties / 4734 with RMA labels; validation 1110 / 190 / 1101; testing 3700 / 190 / 3682, row count only), and `usda_budget_data/testing/` is
+gitignored. Evaluation was run with the Entry 3-4 protocol. The headline model chosen by the pre-declared rule is recorded in `results/chosen_model.json` (see `results/validation_report.md`
+section 1 for the rule table). The audit report is copied to `results/AUDIT_REPORT.md`. `final_test.py` has not been run; it waits for the user's go-ahead. Nothing is committed.
+
+---

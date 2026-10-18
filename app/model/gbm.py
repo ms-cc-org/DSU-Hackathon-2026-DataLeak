@@ -9,26 +9,33 @@ from sklearn.inspection import partial_dependence, permutation_importance
 from data import FEATURES, norm_weights, y_train
 
 MONOTONE = {+1: ["d2_weeks_50pct", "d3_weeks_50pct", "d2_max_pct", "dsci_mean", "heat35_days"],
-            -1: ["precip_ratio_vs_normal", "irr_share_train_mean", "aws_100cm_mm"]}
-CST = [1 if f in MONOTONE[+1] else -1 if f in MONOTONE[-1] else 0 for f in FEATURES]
+            -1: ["precip_ratio_vs_normal", "irr_share_prior_mean", "aws_100cm_mm"]}
+
+
+def monotone_cst(features):
+    return [1 if f in MONOTONE[+1] else -1 if f in MONOTONE[-1] else 0 for f in features]
+
+
+CST = monotone_cst(FEATURES)
 
 
 class GBM:
     name = "B"
 
-    def __init__(self, max_iter=200, max_depth=3, learning_rate=0.05, min_samples_leaf=30, seed=0):
+    def __init__(self, max_iter=200, max_depth=3, learning_rate=0.05, min_samples_leaf=30, seed=0, features=None):
         self.params = dict(max_iter=max_iter, max_depth=max_depth, learning_rate=learning_rate,
                            min_samples_leaf=min_samples_leaf)
         self.seed = seed
+        self.features = list(features) if features else list(FEATURES)
 
     def fit(self, train, target):
-        self.model_ = HistGradientBoostingRegressor(loss="poisson", monotonic_cst=CST, early_stopping=False,
+        self.model_ = HistGradientBoostingRegressor(loss="poisson", monotonic_cst=monotone_cst(self.features), early_stopping=False,
                                                     random_state=self.seed, **self.params)
-        self.model_.fit(train[FEATURES], y_train(train, target), sample_weight=norm_weights(train))
+        self.model_.fit(train[self.features], y_train(train, target), sample_weight=norm_weights(train))
         return self
 
     def predict(self, df):
-        return np.clip(self.model_.predict(df[FEATURES]), 0, 1)
+        return np.clip(self.model_.predict(df[self.features]), 0, 1)
 
     score = predict
 

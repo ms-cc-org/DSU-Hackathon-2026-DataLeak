@@ -5,7 +5,7 @@
 2. E[share | cost > 0]: linear model on log(share) using only rows with share > 0, plus two interactions
    (d2_weeks_50pct x irr_share_train_mean, d2_weeks_50pct x aws_100cm_mm). A tiny ridge penalty (alpha=1 on
    standardised features, ~OLS at this sample size) keeps the collinear drought columns stable.
-3. Expected share = P x E[share | cost > 0] x smearing factor (Duan, weighted mean of exp(residual)).
+3. Expected share = P x E[share | cost > 0] x back-transform factor (ratio estimator: sum w*y / sum w*exp(fit) over the positive rows).
 Scaler / imputer are fitted on the training rows passed to fit() only.
 """
 import numpy as np
@@ -14,7 +14,7 @@ from sklearn.linear_model import LogisticRegression, Ridge
 
 from data import FEATURES, Preprocessor, norm_weights, y_train
 
-INTERACTIONS = [("d2_weeks_50pct", "irr_share_train_mean"), ("d2_weeks_50pct", "aws_100cm_mm")]
+INTERACTIONS = [("d2_weeks_50pct", "irr_share_prior_mean"), ("d2_weeks_50pct", "aws_100cm_mm")]
 
 
 class Hurdle:
@@ -50,8 +50,8 @@ class Hurdle:
         x2 = self._design(train[pos], True)
         self.cols2_ = list(x2.columns)
         self.reg_ = Ridge(alpha=self.ridge_alpha).fit(x2, np.log(y[pos]), sample_weight=w[pos])
-        resid = np.log(y[pos]) - self.reg_.predict(x2)
-        self.smear_ = float(np.average(np.exp(resid), weights=w[pos]))
+        # ratio-estimator back-transform (audit fix): scale so that the weighted sum of fitted amounts equals the weighted sum of actual amounts
+        self.smear_ = float((w[pos] * y[pos]).sum() / (w[pos] * np.exp(self.reg_.predict(x2))).sum())
         return self
 
     def p_any(self, df):

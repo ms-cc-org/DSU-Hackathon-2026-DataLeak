@@ -33,10 +33,12 @@ import numpy as np
 import pandas as pd
 
 SPLITS = {"training": (2000, 2012), "validation": (2013, 2015), "testing": (2016, 2025)}
-TRAIN_END = SPLITS["training"][1]          # normals / averages use training years only
+TRAIN_END = SPLITS["training"][1]          # training years end (rain normals and irrigation averages now use strictly earlier years instead)
 STATES = {"IA": "19", "NE": "31"}
 CROPS = ["CORN", "SOYBEANS"]
-DECISION_MMDD = "08-15"                    # inputs only use data before this date
+DECISION_MMDD = "08-15"                    # daily weather uses data before this date (through Aug 14)
+MAP_CUTOFF_MMDD = "08-13"                  # drought maps: only maps released by Aug 15 (map_date <= Aug 13; the Thursday release of the Aug 13 map is Aug 15)
+FIPS_MERGE = {"19156": "19155"}            # RMA reports Pottawattamie as E (155) + W (156); the repo data has one county, 19155
 
 # ---------------------------------------------------------------- RMA parsing
 COLSOM = ["year", "state_code", "state_abbr", "county_code", "county_name", "commodity_code",
@@ -77,7 +79,7 @@ def read_rma(path, names):
         df = _read_text(path.read_text(encoding="latin-1"), names)
     df = df.apply(lambda s: s.str.strip())
     df = df[df.state_abbr.isin(STATES) & df.commodity.str.upper().isin(CROPS)].copy()
-    df["fips"] = df.state_code.str.zfill(2) + df.county_code.str.zfill(3)
+    df["fips"] = (df.state_code.str.zfill(2) + df.county_code.str.zfill(3)).replace(FIPS_MERGE)   # merged before aggregation, so liability/acres/payouts add up
     df["crop"] = df.commodity.str.upper()
     df["year"] = pd.to_numeric(df.year, errors="coerce").astype(int)
     for c in ["liability", "indemnity", "net_determined_qty", "net_reported_qty", "coverage_level"]:
@@ -175,7 +177,9 @@ def build_inputs(repo):
     dr = dr[dr.fips.isin(fips_set)].copy()
     dr["year"] = dr.map_date.dt.year
     mmdd = dr.map_date.dt.strftime("%m-%d")
-    dr = dr[(mmdd >= "04-01") & (mmdd < DECISION_MMDD)]
+    dr = dr[(mmdd >= "04-01") & (mmdd <= MAP_CUTOFF_MMDD)]
+    dr["d0p"] = 100 - dr.none_pct                  # D0+ area share
+    dr["d1p"] = dr.D1 + dr.D2 + dr.D3 + dr.D4      # D1+ area share
     dr["d2p"] = dr.D2 + dr.D3 + dr.D4
     dr["d3p"] = dr.D3 + dr.D4
     drought = dr.groupby(["fips", "year"]).agg(
@@ -185,6 +189,15 @@ def build_inputs(repo):
     last = dr.sort_values("map_date").groupby(["fips", "year"]).tail(1).set_index(["fips", "year"])
     drought["d2_pct_last_map"] = last.d2p
     drought["d3_pct_last_map"] = last.d3p
+    drought["d0_pct_last_map"] = last.d0p
+    drought["d1_pct_last_map"] = last.d1p
+    # 4-week change: last map minus the map 28 days earlier (missing if that map is absent)
+    key = dr.set_index(["fips", "year", "map_date"])[["d1p", "dsci"]]
+    idx = pd.MultiIndex.from_arrays([last.index.get_level_values("fips"), last.index.get_level_values("year"),
+                                     (last.map_date - pd.Timedelta(days=28)).to_numpy()])
+    prev = key.reindex(idx)
+    drought["d1_pct_change_4wk"] = pd.Series(last.d1p.to_numpy() - prev.d1p.to_numpy(), index=last.index)
+    drought["dsci_change_4wk"] = pd.Series(last.dsci.to_numpy() - prev.dsci.to_numpy(), index=last.index)
 
     # Weather: daily, May 1 up to Aug 15 (heat from Jun 1)
     w = pd.read_parquet(d / "processed/acis/weather_daily.parquet")
@@ -198,11 +211,16 @@ def build_inputs(repo):
     w["heat32"] = (w.tmax_c >= 32) & summer
     w["heat35"] = (w.tmax_c >= 35) & summer
     w["tmax_jul"] = w.tmax_c.where(w.date.dt.month == 7)
+    w["precip_30d"] = w.pcpn_mm.where(w.date.dt.strftime("%m-%d") >= "07-16")      # Jul 16 - Aug 14
     weather = w.groupby(["fips", "year"]).agg(
         precip_mm=("pcpn_mm", "sum"), heat32_days=("heat32", "sum"), heat35_days=("heat35", "sum"),
-        tmax_jul_mean=("tmax_jul", "mean"), gdd=("gdd", "sum"))
-    normal = weather.loc[weather.index.get_level_values("year") <= TRAIN_END, "precip_mm"].groupby("fips").mean()
-    weather["precip_ratio_vs_normal"] = weather.precip_mm / weather.index.get_level_values("fips").map(normal)
+        tmax_jul_mean=("tmax_jul", "mean"), gdd=("gdd", "sum"), precip_30d_mm=("precip_30d", "sum"))
+    # rain normals use strictly EARLIER years only (weather data start in 1999), at least 3 of them: fold-safe for every split
+    weather = weather.sort_index()
+    for col, name in [("precip_mm", "precip_normal_prior"), ("precip_30d_mm", "precip_30d_normal_prior")]:
+        weather[name] = weather.groupby(level="fips")[col].transform(lambda s: s.shift(1).expanding(min_periods=3).mean())
+    weather["precip_ratio_vs_normal"] = weather.precip_mm / weather.precip_normal_prior
+    weather["precip_30d_ratio"] = weather.precip_30d_mm / weather.precip_30d_normal_prior
 
     # Soil (static) and irrigation (training-years average, Nebraska mostly)
     soil = pd.read_parquet(d / "processed/soil/soil_county.parquet")
@@ -210,24 +228,29 @@ def build_inputs(repo):
     soil = soil.set_index("fips")
     irr = pd.read_parquet(d / "processed/irrigation/nass_irrigation.parquet")
     irr["fips"] = irr.fips.astype(str).str.zfill(5)
-    irr = irr[irr.year <= TRAIN_END].groupby(["fips", "crop"]).irrigated_share.mean()
+    irr = irr.sort_values(["fips", "crop", "year"])
+    irr["irr_share_prior_mean"] = irr.groupby(["fips", "crop"]).irrigated_share.transform(lambda s: s.shift(1).expanding(min_periods=1).mean())
+    irr = irr.rename(columns={"irrigated_share": "irr_share_year"})[["fips", "crop", "year", "irr_share_year", "irr_share_prior_mean"]]
 
     x = base.join(drought, on=["fips", "year"]).join(weather, on=["fips", "year"])
     x["aws_100cm_mm"] = x.fips.map(soil.aws_100cm_mm)
     x["droughty_pct"] = x.fips.map(soil.droughty_pct)
     x["nccpi"] = np.where(x.crop == "CORN", x.fips.map(soil.nccpi_corn), x.fips.map(soil.nccpi_soy))
-    share = pd.Series([irr.get((f, c), np.nan) for f, c in zip(x.fips, x.crop)], index=x.index)
-    x["irr_known"] = share.notna().astype(int)
-    x["irr_share_train_mean"] = share.fillna(0.0)
+    n_rows = len(x)
+    x = x.merge(irr, on=["fips", "crop", "year"], how="left")
+    assert len(x) == n_rows
+    x["irr_known"] = x.irr_share_prior_mean.notna().astype(int)
+    x["irr_share_prior_mean"] = x.irr_share_prior_mean.fillna(0.0)
     x["decision_date"] = x.year.astype(str) + "-" + DECISION_MMDD
     return x
 
 
 INPUT_COLS = ["fips", "county_name", "state_alpha", "crop", "year", "decision_date",
               "d2_weeks_50pct", "d3_weeks_50pct", "d2_max_pct", "dsci_mean", "d2_pct_last_map",
-              "d3_pct_last_map", "precip_mm", "precip_ratio_vs_normal", "heat32_days", "heat35_days",
-              "tmax_jul_mean", "gdd", "aws_100cm_mm", "droughty_pct", "nccpi", "irr_share_train_mean",
-              "irr_known", "acres_planted_prev3_mean", "yield_prev5_mean"]
+              "d3_pct_last_map", "d0_pct_last_map", "d1_pct_last_map", "d1_pct_change_4wk", "dsci_change_4wk",
+              "precip_mm", "precip_normal_prior", "precip_ratio_vs_normal", "precip_30d_ratio",
+              "heat32_days", "heat35_days", "tmax_jul_mean", "gdd", "aws_100cm_mm", "droughty_pct", "nccpi",
+              "irr_share_year", "irr_share_prior_mean", "irr_known", "acres_planted_prev3_mean", "yield_prev5_mean"]
 LABEL_COLS = ["fips", "county_name", "state_alpha", "crop", "year", "rma_year_available", "insured",
               "liability", "insured_acres", "avg_coverage", "drought_indemnity", "heat_indemnity",
               "other_indemnity", "drought_loss_acres", "drought_payout_share", "drought_payout_per_acre", "drought_loss_acre_share",
@@ -250,12 +273,16 @@ Each county folder is named `FIPS_County_ST` (FIPS first, because county names r
 `fips, crop, year` (fips is 5-character text: always read it with `dtype={{"fips": str}}`).
 
 ## inputs.csv: only what is known before {dd} of that year
-- Drought (weekly maps, Apr 1 to Aug 14): `d2_weeks_50pct` weeks with D2+ on >=50% of county,
-  `d3_weeks_50pct`, `d2_max_pct`, `dsci_mean`, `d2_pct_last_map`, `d3_pct_last_map`.
-- Weather (daily, May 1 to Aug 14; heat counted from Jun 1): `precip_mm`, `precip_ratio_vs_normal`
-  (normal = {tr} average), `heat32_days`, `heat35_days`, `tmax_jul_mean`, `gdd` (base 10 C, cap 30 C).
+- Drought (weekly maps dated Apr 1 to Aug 13, i.e. only maps released by Aug 15): `d2_weeks_50pct` weeks with D2+ on >=50% of county,
+  `d3_weeks_50pct`, `d2_max_pct`, `dsci_mean`, and on the last map `d0_pct_last_map` (D0+ area share), `d1_pct_last_map` (D1+),
+  `d2_pct_last_map`, `d3_pct_last_map`, plus `d1_pct_change_4wk` and `dsci_change_4wk` (last map minus the map 28 days earlier).
+- Weather (daily, May 1 to Aug 14; heat counted from Jun 1): `precip_mm`, `precip_normal_prior` (mean `precip_mm` of the strictly earlier years,
+  weather data start in 1999, at least 3 earlier years, else blank), `precip_ratio_vs_normal` (= precip_mm / precip_normal_prior), `precip_30d_ratio`
+  (precipitation Jul 16-Aug 14 over the same window's mean in strictly earlier years), `heat32_days`, `heat35_days`, `tmax_jul_mean`,
+  `gdd` (base 10 C, cap 30 C). Because normals only use earlier years, no row's normal contains its own or later years.
 - Soil: `aws_100cm_mm`, `droughty_pct`, `nccpi` (crop-specific).
-- Irrigation: `irr_share_train_mean` ({tr} average; 0 where unknown), `irr_known` (1 = real value).
+- Irrigation: `irr_share_year` (NASS irrigated share of that year, kept for transparency, not a model input), `irr_share_prior_mean`
+  (mean of the strictly earlier years; 0 where unknown), `irr_known` (1 = real value).
 - History: `acres_planted_prev3_mean`, `yield_prev5_mean` (previous years only).
 
 ## labels.csv: what actually happened (never use as model inputs)

@@ -1,15 +1,13 @@
 {
   "method": "C",
-  "label": "rough 80% range (10th-90th percentile)",
+  "label": "historical scenario range (rough)",
   "pooled_coverage": {
-    "A": 0.45,
-    "B": 0.4,
-    "C": 0.8,
-    "D": 0.45,
-    "G": 0.4
+    "A": 0.2857142857142857,
+    "B": 0.21428571428571427,
+    "C": 0.85,
+    "D": 0.2857142857142857
   },
   "target": 0.8,
-  "chosen_point_inside_range": "20/20",
-  "budget_range_coverage_pooled": 0.8,
-  "note": "no method is tuned to hit 80%; the closest on calibrated walk-forward + validation is used, widened to include the chosen model's point estimate, and labelled rough"
+  "headline_point_inside_range": "20/20",
+  "budget_range_coverage": 0.85
 }
