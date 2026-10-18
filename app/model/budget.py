@@ -2,10 +2,11 @@
 
 Known on Aug 15 from that year's coverage file: liability, insured_acres, avg_coverage (c), full_crop_value.
 V = full_crop_value / insured_acres (full value per acre).
-    X  insurance pays        = predicted T1 x liability
-    A  damaged acres         = predicted T2 x insured_acres
-    Y  farmers' out-of-pocket = A x V x (1 - c)
-    Z  estimated relief need  = A x V x max(0, 0.95 - c)      # ERP-style, upper-end estimate
+    X  estimated insurance payouts     = predicted T1 x liability
+    A  damaged acres (intermediate)    = predicted T2 x insured_acres
+    Y  estimated deductible exposure   = A x V x (1 - c)
+    Z  illustrative relief allocation under a 95% coverage assumption (inspired by USDA ERP 2022)
+       = A x V x max(0, 0.95 - c); an upper-end illustration, not a prediction of any program payment
 """
 import json
 
@@ -35,7 +36,7 @@ def rollup(df, comp, by=("state_alpha",)):
 
 
 # ------------------------------------------------------------------ ranges (section 6)
-RANGE_LABEL = "rough 80% range (10th-90th percentile)"
+RANGE_LABEL = "historical scenario range (rough; 10th-90th percentile of past outcomes)"
 
 
 def residual_pool(oos, model, target="t1"):
@@ -97,13 +98,14 @@ def chosen_model():
 
 # ------------------------------------------------------------------ calibration
 def load_calibration():
-    """results/calibration.csv: one multiplier k per model x target (t1 = payout share, t2 = damaged-acre share), fitted by
-    evaluate.py as sum(actual) / sum(predicted) on walk-forward predictions 2006-2012 only."""
+    """results/calibration.csv: for each model x target (t1 = payout share, t2 = damaged-acre share) the multiplier applied to NEW years: k_latest = sum(actual)/sum(predicted)
+    over all out-of-sample years 2006-2015 if nested calibration lowered that model's statewide absolute error (use_calibration), else 1. Within the evaluation, k for year Y
+    uses only earlier years (evaluate.py, nested)."""
     f = RESULTS / "calibration.csv"
     if not f.exists():
         return {}
     c = pd.read_csv(f)
-    return {(r.model, r.target): float(r.k) for r in c.itertuples()}
+    return {(r.model, r.target): float(r.k_applied_to_new_years) for r in c.itertuples()}
 
 
 def get_k(model, target="t1"):
@@ -111,7 +113,7 @@ def get_k(model, target="t1"):
 
 
 def calibrate(pred, model, target="t1"):
-    """Predicted share x the model's calibration factor k (not clipped: clip to [0, 1] when turning into amounts)."""
+    """Predicted share x the model's calibration factor for new years (1 if calibration did not help it; not clipped: clip to [0, 1] when turning into amounts)."""
     return np.asarray(pred, float) * get_k(model, target)
 
 

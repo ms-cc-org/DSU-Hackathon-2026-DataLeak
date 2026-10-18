@@ -1,14 +1,14 @@
-"""Section 5: the final held-out test (2016-2025). Run ONCE, after the model is final.
+"""The official held-out test (2016-2025). Run ONCE, after the model is frozen and the user has given the go-ahead:
 
     python app/model/final_test.py --i-am-sure
 
-(Run it as a script from the repo root; `python -m app.model.final_test` does not work here because `app/` is not a package and
-the root-level `data/` folder would shadow `data.py`.)
+(Run it as a script from the repo root; `python -m app.model.final_test` does not work here because `app/` is not a package and the root-level
+`data/` folder would shadow `data.py`.)
 
-Retrains every model on 2000-2015 with the hyper-parameters tuned in evaluate.py and the calibration factors k from
-results/calibration.csv (walk-forward 2006-2012; no re-tuning, no re-fitting of k), predicts 2016-2025, and writes
-results/test_report.md plus csv files. The model is frozen: do not change anything after seeing these results; report failures too.
-Expected hard case, declared in advance: Iowa 2020 (derecho: wind loss, mostly not drought-coded).
+Trains A, B, C, D and the baselines on 2000-2015 with the hyper-parameters tuned in evaluate.py (no re-tuning), predicts 2016-2025, applies NESTED calibration (the
+multiplier for year Y uses only earlier years: the 2006-2015 out-of-sample history plus the already-passed test years; only for model-targets where evaluate.py found
+calibration helpful), builds the historical scenario ranges (whole earlier years' residuals, years < Y), widens the budget range to contain the headline model's point
+estimate, and writes results/test_report.md plus csv files. Nothing is tuned or changed after seeing the results; failures are reported too.
 """
 import argparse
 import json
@@ -18,148 +18,161 @@ import sys
 import numpy as np
 import pandas as pd
 
-from budget import residual_pool
-from data import RESULTS, load_usable
-from evaluate import (CAPTURE_NOISE, LABEL, MODELS, RANGED, RESAMPLED, WAPE_NOISE, apply_k, attach_coverage, budget_range_rows,
-                      f_cov, f_pct, fit_predict, known_misses, md, metrics, range_rows, state_year_points)
-from data import add_year_class
+from data import RESULTS, add_year_class, load_usable
+from evaluate import (BASELINES, CANDIDATES, LABEL, MODELS, RANGED, SIG_SHARE, add_z, apply_k, attach_range, budget_range_rows, f_amt, f_pct, fit_predict, history,
+                      k_table, known_misses, md, metrics, range_rows, state_year_points, summary_md, trigger_agreement, two_by_two)
 
 OFFICIAL = "Version 1 – official test, model frozen before seeing test data"
-EXPECTED_MISS = ("IA", 2020)
+DISCLOSURE = ("Disclosure: some 2016–2025 years appeared in earlier exploratory analyses (2018/2022 payout totals, early 2022/2023 budget tests). "
+              "The headline model was chosen by the pre-declared rule on walk-forward + validation only (DECISIONS.md, Entries 3-4).")
 
 
-def ref_table(m, chosen):
-    """Capture, WAPE, AUC, calibration, range coverage per model; chosen model starred; B0 and B1 first, then the rest."""
-    r = m[m.model.isin(MODELS)].set_index("model")
-    order = ["B0", "B1", chosen] + [x for x in MODELS if x not in ("B0", "B1", chosen)]
-    rows = []
-    for name in order:
-        x = r.loc[name]
-        rows.append({"Model": ("★ " + LABEL[name] + " (chosen)") if name == chosen else LABEL[name],
-                     "Budget capture (top-20)": f_pct(x.capture_top20, 1), "WAPE": f"{x.wape:.2f}",
-                     "Any-payout AUC": "–" if pd.isna(x.auc_any_payout) else f"{x.auc_any_payout:.3f}",
-                     "Calibration (Σpred/Σactual)": f"{x.calibration:.2f}",
-                     "80% range coverage": f_cov(x) if name in RANGED else "–"})
-    rnd = m[m.model == "Random"]
-    if len(rnd):
-        rows.append({"Model": "*Random counties (reference)*", "Budget capture (top-20)": f"*{f_pct(rnd.capture_top20.iloc[0], 1)}*",
-                     "WAPE": "–", "Any-payout AUC": "–", "Calibration (Σpred/Σactual)": "–", "80% range coverage": "–"})
-    return md(pd.DataFrame(rows))
-
-
-def verdict_text(m, chosen, bud, tot_chosen):
-    g = lambda grp, model: m[(m.group == grp) & (m.model == model)].iloc[0]
-    c, b1, rnd = g("all", chosen), g("all", "B1"), m[(m.group == "all") & (m.model == "Random")].iloc[0]
-    d_cap, wape_red = c.capture_top20 - b1.capture_top20, 1 - c.wape / b1.wape
-    if d_cap > CAPTURE_NOISE and wape_red > WAPE_NOISE:
-        kind = "a clear win"
-    elif d_cap < -CAPTURE_NOISE and wape_red < -WAPE_NOISE:
-        kind = "a loss"
-    elif abs(d_cap) <= CAPTURE_NOISE and abs(wape_red) <= WAPE_NOISE:
-        kind = "a tie"
-    else:
-        kind = "mixed (better on one measure, within noise or worse on the other)"
-    s = [f"Against B1 (the drought-map rule) the frozen model, {LABEL[chosen]}, is {kind} on the held-out years: budget capture {c.capture_top20:.1%} vs "
-         f"{b1.capture_top20:.1%} (random {rnd.capture_top20:.1%}) and county-level dollar error (WAPE) {c.wape:.2f} vs {b1.wape:.2f} "
-         f"({abs(wape_red):.0%} {'lower' if wape_red > 0 else 'higher'}), judged against noise bands of {CAPTURE_NOISE * 100:.0f} capture points and {WAPE_NOISE:.0%} of WAPE."]
-    parts = []
-    for grp, name in [("drought", "drought years"), ("quiet", "quiet years")]:
-        sub = m[(m.group == grp) & (m.model == chosen)]
-        if len(sub):
-            x, y = sub.iloc[0], g(grp, "B1")
-            parts.append(f"{name} ({int(x.state_years)} state-year{'s' if int(x.state_years) != 1 else ''}): capture {x.capture_top20:.1%} vs {y.capture_top20:.1%}, WAPE {x.wape:.2f} vs {y.wape:.2f}, "
-                         f"Σpred/Σactual {x.calibration:.2f} vs {y.calibration:.2f}")
-    s.append("Split by year type, " + "; ".join(parts) + ".")
-    s.append(f"Overall calibration is {c.calibration:.2f} for {LABEL[chosen]} vs {b1.calibration:.2f} for B1 (1.00 = the statewide budget is the right size).")
-    s.append(f"The rough 80% budget range contained the actual statewide payout in {int(bud.inside.sum())} of {len(bud)} state-years ({bud.inside.mean():.0%}; target about 80%).")
-    if EXPECTED_MISS in tot_chosen.index:
-        e = tot_chosen.loc[EXPECTED_MISS]
-        s.append(f"Iowa 2020, the derecho year declared in advance as an expected miss (wind, not drought), was predicted at ${e.pred / 1e6:,.1f}M against ${e.actual / 1e6:,.1f}M actual.")
+def verdict_text(M, hl):
+    g = lambda grp, m, col: M[(M.target == "t1") & (M.group == grp) & (M.model == m)][col].iloc[0]
+    better = {}
+    for grp in ("all", "drought"):
+        for trig in ("B2a", "B2b"):
+            better[(grp, trig)] = (g(grp, hl, "stat_abs_err") < g(grp, trig, "stat_abs_err"), g(grp, hl, "capture_top20") > g(grp, trig, "capture_top20"))
+    err_wins = sum(v[0] for v in better.values())
+    cap_wins = sum(v[1] for v in better.values())
+    kind = ("a clear win" if err_wins == 4 and cap_wins == 4 else "a loss" if err_wins == 0 and cap_wins == 0 else "mixed")
+    s = []
+    for grp, name in (("drought", "drought state-years"), ("all", "all state-years")):
+        s.append(f"On {name}, {LABEL[hl]} has a statewide absolute error of {f_amt(g(grp, hl, 'stat_abs_err'), '$')} against {f_amt(g(grp, 'B2a', 'stat_abs_err'), '$')} for B2a and "
+                 f"{f_amt(g(grp, 'B2b', 'stat_abs_err'), '$')} for B2b, top-20 capture {f_pct(g(grp, hl, 'capture_top20'), 1)} against {f_pct(g(grp, 'B2a', 'capture_top20'), 1)} and "
+                 f"{f_pct(g(grp, 'B2b', 'capture_top20'), 1)} (best possible {f_pct(g(grp, hl, 'best_capture'), 1)}), and under-budgets by {f_amt(g(grp, hl, 'under_budget_total'), '$')} in total "
+                 f"against {f_amt(g(grp, 'B2a', 'under_budget_total'), '$')} and {f_amt(g(grp, 'B2b', 'under_budget_total'), '$')}.")
+    s.append(f"Against the current-practice triggers the result is **{kind}** (lower error in {err_wins} of 4 comparisons, higher capture in {cap_wins} of 4; comparisons are drought / all state-years x B2a / B2b); "
+             f"B1 (statewide absolute error {f_amt(g('all', 'B1', 'stat_abs_err'), '$')}, capture {f_pct(g('all', 'B1', 'capture_top20'), 1)} over all state-years) is a sanity check only.")
+    s.append(f"The headline model's worst single state-year shortfall is {f_amt(g('all', hl, 'worst_shortfall'), '$')} (B2a {f_amt(g('all', 'B2a', 'worst_shortfall'), '$')}, B2b {f_amt(g('all', 'B2b', 'worst_shortfall'), '$')}).")
     return " ".join(s)
 
 
 def run_final(train_splits, eval_split, out_dir, allow_test=False, label=OFFICIAL):
     cfg = json.load(open(RESULTS / "chosen_model.json"))
     method = json.load(open(RESULTS / "range_method.json"))["method"]
-    params, chosen = cfg["params"], cfg["chosen"]
+    params, hl = cfg["params"], cfg["chosen"]
     train = load_usable(*train_splits)
     test = load_usable(eval_split, allow_test=allow_test)
-    cal = pd.read_csv(RESULTS / "calibration.csv")
-    pred = apply_k(fit_predict(train, test, params), cal)                    # k from walk-forward 2006-2012
+    raw = fit_predict(train, test, params)
 
-    oos = pd.read_csv(RESULTS / "oos_predictions.csv", dtype={"fips": str})   # calibrated walk-forward + validation predictions
-    cov = range_rows(pred, {c: residual_pool(oos, c) for c in RESAMPLED}, "t1")
-    m = pd.concat([attach_coverage(metrics(pred), cov)])
-    bud = budget_range_rows(cov, chosen, method)
-    pts = state_year_points(pred, "t1")
-    cls = add_year_class(pred).drop_duplicates(["state_alpha", "year"]).set_index(["state_alpha", "year"]).sy_class
-    liab = pred.groupby(["state_alpha", "year"]).liability.sum()
-    misses, _ = known_misses(pts, liab)
+    # nested calibration: k for each test year from the 2006-2015 history plus the test years already passed
+    hist = pd.read_csv(RESULTS / "calibration_history.csv")
+    hist = hist[hist.year < int(test.year.min())]          # only years before the first scored year
+    ktab = k_table(pd.concat([hist, history(raw)], ignore_index=True))
+    cal_tbl = pd.read_csv(RESULTS / "calibration.csv")
+    use = {(r.model, r.target): bool(r.use_calibration) for r in cal_tbl.itertuples()}
+    cal = add_z(apply_k(raw, ktab, use))
+
+    # historical scenario ranges: residual pools = calibrated 2006-2015 predictions + earlier test years
+    hist_oos = pd.read_csv(RESULTS / "oos_predictions.csv", dtype={"fips": str})
+    hist_oos = hist_oos[hist_oos.year < int(test.year.min())]
+    cov = range_rows(pd.concat([hist_oos, cal], ignore_index=True))
+    cov = cov[cov.year.isin(set(test.year))]
+    M = pd.concat([attach_range(metrics(cal, MODELS, "t1"), cov).assign(split="test")] +
+                  [metrics(cal, MODELS, t).assign(split="test") for t in ("t2", "z")], ignore_index=True)
+    pts = state_year_points(cal, "t1")
+    bud = budget_range_rows(cov, pts[pts.model == hl].set_index(["state_alpha", "year"]).pred, method)
+    cls = add_year_class(cal).drop_duplicates(["state_alpha", "year"]).set_index(["state_alpha", "year"]).sy_class
+    misses, _ = known_misses(pts, cal.groupby(["state_alpha", "year"]).liability.sum())
+    cd, pr = trigger_agreement(cal, hl)
+    tbl, note = two_by_two(cd, LABEL[hl])
 
     out_dir = pathlib.Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    m.to_csv(out_dir / "test_metrics.csv", index=False)
-    pred.drop(columns=[c for c in pred if c.startswith("score")]).to_csv(out_dir / "test_predictions.csv", index=False)
+    M.to_csv(out_dir / "test_metrics.csv", index=False)
+    cal.drop(columns=[c for c in cal if c in ("_one",)]).to_csv(out_dir / "test_predictions.csv", index=False)
     cov.to_csv(out_dir / "test_range_coverage.csv", index=False)
     bud.reset_index().to_csv(out_dir / "test_budget_range.csv", index=False)
+    cd.to_csv(out_dir / "test_trigger_agreement_county_years.csv", index=False)
+    ktab[ktab.year.isin(set(test.year))].to_csv(out_dir / "test_nested_k.csv", index=False)
 
     years = f"{int(test.year.min())}-{int(test.year.max())}"
-    tr_years = f"{int(train.year.min())}-{int(train.year.max())}"
-    # statewide totals table: actual, frozen model's prediction, budget range, inside / outside, other models for reference
-    p = pts.pivot_table(index=["state_alpha", "year"], columns="model", values="pred")
-    act = pts.drop_duplicates(["state_alpha", "year"]).set_index(["state_alpha", "year"]).actual
+    sel = lambda t, grp: M[(M.target == t) & (M.group == grp)]
+    drought_list = ", ".join(sorted(f"{s} {y}" for (s, y), v in cls.items() if v == "drought")) or "none"
     rows = []
     for (s, y), b in bud.sort_index(level=["state", "year"]).iterrows():
-        row = {"state": s, "year": y, "type": cls[(s, y)], "actual $M": f"{act[(s, y)] / 1e6:,.1f}",
-               f"{LABEL[chosen]} prediction $M": f"{p.loc[(s, y), chosen] / 1e6:,.1f}",
-               "budget range $M (rough 80%)": f"{b.budget_low / 1e6:,.1f}–{b.budget_high / 1e6:,.1f}",
-               "actual vs range": "inside ✓" if b.inside else "outside ✗"}
-        for n in MODELS:
-            if n != chosen:
-                row[LABEL[n] + " $M"] = f"{p.loc[(s, y), n] / 1e6:,.1f}"
+        row = {"state": s, "year": y, "type": cls[(s, y)], "actual X $M": f"{b.actual / 1e6:,.1f}"}
+        p = pts[(pts.state_alpha == s) & (pts.year == y)].set_index("model").pred
+        for m in [hl, "B2a", "B2b"] + [x for x in CANDIDATES if x != hl]:
+            row[LABEL[m] + " $M"] = f"{p[m] / 1e6:,.1f}"
+        row["budget range $M"] = f"{b.budget_low / 1e6:,.1f}–{b.budget_high / 1e6:,.1f}"
+        row["actual vs range"] = "inside ✓" if b.inside else "outside ✗"
         rows.append(row)
-    tot_chosen = pts[pts.model == chosen].set_index(["state_alpha", "year"])
-    expected = ""
-    if EXPECTED_MISS in tot_chosen.index:
-        e = tot_chosen.loc[EXPECTED_MISS]
-        expected = (f"- **Iowa 2020 (declared in advance as an expected miss).** The Aug 10, 2020 derecho caused wind losses that are mostly not coded as drought, "
-                    f"so a drought-payout model should not predict them. {LABEL[chosen]} predicted ${e.pred / 1e6:,.1f}M against ${e.actual / 1e6:,.1f}M actual "
-                    f"({'outside' if not bud.loc[EXPECTED_MISS].inside else 'inside'} its budget range).")
+    rc = []
+    for m in RANGED:
+        for grp in ("all", "drought", "quiet"):
+            x = cov[cov.model == m]
+            x = x if grp == "all" else x[x.sy_class == grp]
+            rc.append({"model": LABEL[m], "state-years": grp, "n": len(x), "inside": int(x.inside.sum()), "coverage": f_pct(x.inside.mean()) if len(x) else "–",
+                       "mean width": f_amt(x.width.mean(), "$") if len(x) else "–", "actual above upper bound": int(x.upper_miss.sum()), "actual below lower bound": int(x.lower_miss.sum())})
     text = f"""# Final test report ({years}): {label}
 
-Models retrained on {tr_years} ({len(train)} rows) with the hyper-parameters from `results/params.json` (tuned on training walk-forward only)
-and the calibration factors `results/calibration.csv` (k from walk-forward 2006-2012), predicting {len(test)} rows. Nothing was tuned or changed using these years.
-**Headline model: {LABEL[chosen]}** (`results/chosen_model.json`: {cfg.get('headline_result', cfg['reason'])}). **Frozen for this test: {', '.join(LABEL[m] for m in cfg.get('frozen_models', [chosen]))}**;
-all other models (baselines B0, B1, B2 and strategies A, C) are shown for reference. Budget range = the `{method}` range method, widened where needed so the headline
-model's point estimate lies inside it, and rough. Amounts are drought payout in dollars (T1 x liability), summed over crops per county-year.
-G (if present) is Built with PriorLabs-TabPFN (TabPFN v2 weights, Prior Labs License 1.1).
+{DISCLOSURE}
 
-## 1. Summary, all state-years (T1 payout share)
-{ref_table(m[m.group == 'all'], chosen)}
+**Headline model: {LABEL[hl]}** (chosen by the pre-declared rule on walk-forward + validation: {cfg['reason']}). Candidates A, B, C, D and the baselines (Z0 predict zero, B1 bin average, B2a USDA binary trigger,
+B2b tiered LFP-style trigger, B3 liability only, B4 liability x D2+ last map) were trained on 2000-2015 ({len(train)} rows) and predict {len(test)} rows. Calibration is nested (k for a year uses only earlier years,
+including the test years already passed; applied only where evaluate.py found it helpful). **X** = estimated insurance payouts, **Y** = estimated deductible exposure, **Z** = illustrative relief allocation under a 95%
+coverage assumption (inspired by USDA ERP 2022). Drought state-years in this window (actual statewide payout >= 3% of insured $): {drought_list}. The "historical scenario range" is the rough 10th-90th percentile of past outcomes;
+the budget range is the `{method}` range widened to contain the headline model's point estimate. Metric definitions are in `validation_report.md`.
 
-## 2. Statewide drought payout per state-year ($M)
+## 1. Headline vs current USDA practice (B2a, B2b)
+**All state-years** ({int(sel('t1', 'all').state_years.iloc[0])})
+
+{summary_md(sel('t1', 'all'), '$', [hl, 'B2a', 'B2b'])}
+
+**Drought state-years only**
+
+{summary_md(sel('t1', 'drought'), '$', [hl, 'B2a', 'B2b']) if (sel('t1', 'drought').model == hl).any() else 'No drought state-years in this window.'}
+
+## 2. All models, T1 (X)
+**All state-years**
+
+{summary_md(sel('t1', 'all'), '$')}
+
+**Drought state-years only**
+
+{summary_md(sel('t1', 'drought'), '$') if (sel('t1', 'drought').model == hl).any() else 'No drought state-years in this window.'}
+
+**Quiet state-years only**
+
+{summary_md(sel('t1', 'quiet'), '$') if (sel('t1', 'quiet').model == hl).any() else 'No quiet state-years in this window.'}
+
+## 3. T2 (damaged acres) and Z (illustrative relief allocation)
+**T2, all state-years**
+
+{summary_md(sel('t2', 'all'), 'acres', ranged=False)}
+
+**Z, all state-years**
+
+{summary_md(sel('z', 'all'), '$', ranged=False)}
+
+**Z, drought state-years only**
+
+{summary_md(sel('z', 'drought'), '$', ranged=False) if (sel('z', 'drought').model == hl).any() else 'No drought state-years in this window.'}
+
+## 4. Statewide X per state-year ($M)
 {md(pd.DataFrame(rows))}
 
-## 3. Drought years vs quiet years
-Drought year = actual statewide payout >= 3% of insured dollars (grouping only). Quiet = all other state-years.
+## 5. Historical scenario range coverage
+{md(pd.DataFrame(rc))}
 
-**Drought years**
+Budget range ({method} widened around {LABEL[hl]}'s point estimate): actual inside in {int(bud.inside.sum())} of {len(bud)} state-years; the point estimate was inside the raw range in {int(bud.point_inside.sum())}.
 
-{ref_table(m[m.group == 'drought'], chosen) if (m.group == 'drought').any() else 'No drought state-years in this window.'}
+## 6. Trigger agreement (B2a vs {LABEL[hl]}, significant payout = share >= {SIG_SHARE:.0%})
+{md(pr.reset_index().rename(columns={'index': 'flagging rule'}))}
 
-**Quiet years**
+{md(tbl)}
 
-{ref_table(m[m.group == 'quiet'], chosen) if (m.group == 'quiet').any() else 'No quiet state-years in this window.'}
+{note}
 
-## 4. Known misses
-State-years where every model's statewide total was off by more than 50%, with a one-line likely reason:
+## 7. Known misses
+State-years where B1 and all four candidates were off by more than 50% (statewide X):
 
-{md(misses.drop(columns=[c for c in misses if c.endswith(' $M') and c not in ('actual $M', LABEL[chosen] + ' $M')])) if len(misses) else 'None.'}
+{md(misses) if len(misses) else 'None.'}
 
-{expected}
-
-## 5. Verdict vs B1
-{verdict_text(m[m.target == 't1'] if 'target' in m else m, chosen, bud, tot_chosen)}
+## 8. Verdict vs current USDA practice
+{verdict_text(M, hl)}
 """
     (out_dir / "test_report.md").write_text(text)
     return text
@@ -167,12 +180,10 @@ State-years where every model's statewide total was off by more than 50%, with a
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--i-am-sure", action="store_true",
-                    help="confirm that the model is final and the held-out 2016-2025 data may be read")
+    ap.add_argument("--i-am-sure", action="store_true", help="confirm that the model is frozen and the held-out 2016-2025 data may be read")
     a = ap.parse_args()
     if not a.i_am_sure:
-        print("Refusing to run: this reads the held-out testing/ split, which must be used once, at the very end.\n"
-              "Re-run with --i-am-sure when the model is final.")
+        print("Refusing to run: this reads the held-out testing/ split, which must be used once, at the very end.\nRe-run with --i-am-sure when the model is final.")
         return 2
     run_final(("training", "validation"), "testing", RESULTS, allow_test=True)
     print("wrote", RESULTS / "test_report.md")

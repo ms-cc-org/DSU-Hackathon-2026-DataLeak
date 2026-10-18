@@ -1,31 +1,60 @@
 {
-  "chosen": "B",
-  "reason": "near-best on both metrics (capture within 0.02, WAPE within 5% of best); simplest of ['G']",
-  "beats_B1_outside_noise": true,
+  "chosen": "D",
+  "headline": "D",
+  "rule_met": true,
+  "reason": "lowest drought-year statewide absolute $ error among candidates beating B3 (0.257) and B4 (0.289) on capture; within 5% of the lowest error: ['D']; simplest wins",
   "params": {
     "B": {
-      "max_iter": 200,
-      "max_depth": 4
+      "max_iter": 400,
+      "max_depth": 3
     },
     "C": {
-      "k": 10,
+      "k": 25,
       "drought_weight": 1.0
     },
     "D": {
       "alpha": 0.01
     }
   },
-  "chosen_before_calibration": "G",
-  "selection_rule_pick": "G",
-  "note": "selection_rule_pick = pre-declared rule on pooled calibrated metrics (walk-forward part in-sample for k; G's pick is not reproducible to the last decimal because TabPFN on Apple MPS is not bit-reproducible); chosen = headline model per DECISIONS.md",
-  "headline": "B",
-  "headline_rule": "G is the headline if CPU prediction for one year takes under 10 s and it installs from requirements.txt; otherwise B (DECISIONS.md, Entry 1, A.4)",
-  "headline_result": "G fails the speed test: CPU prediction of one year (367 IA+NE county-crops, T1+T2) took a median 353 s (T1 163 s, T2 189 s) against the 10 s limit, on 8 cores; it does install cleanly from requirements.txt. So B is the headline model.",
   "frozen_models": [
-    "G",
+    "A",
     "B",
+    "C",
     "D"
   ],
-  "deployability_file": "app/model/results/g_deployability.json",
-  "headline_decided": "2026-10-17 22:52 EDT"
+  "baselines": [
+    "Z0",
+    "B1",
+    "B2a",
+    "B2b",
+    "B3",
+    "B4"
+  ],
+  "rule": "Entry 3 item 12",
+  "candidates": [
+    {
+      "model": "A",
+      "drought_stat_abs_err": 456998925.4021732,
+      "capture_all": 0.5046731260060004,
+      "beats_B3_and_B4": true
+    },
+    {
+      "model": "B",
+      "drought_stat_abs_err": 469707648.16489315,
+      "capture_all": 0.509605290797474,
+      "beats_B3_and_B4": true
+    },
+    {
+      "model": "C",
+      "drought_stat_abs_err": 445213007.09127253,
+      "capture_all": 0.43512249355330157,
+      "beats_B3_and_B4": true
+    },
+    {
+      "model": "D",
+      "drought_stat_abs_err": 334282159.8033003,
+      "capture_all": 0.5282524968978849,
+      "beats_B3_and_B4": true
+    }
+  ]
 }

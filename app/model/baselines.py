@@ -28,7 +28,6 @@ class B0:
     def predict(self, df):
         return np.array([self.table_.get(k, self.global_) for k in zip(df.state_alpha, df.crop)])
 
-    score = predict
 
 
 def d2_bin(weeks):
@@ -62,13 +61,23 @@ class B1:
                 out[i] = self.iso_[k].predict([b])[0]
         return out
 
-    score = predict
 
 
-class B2:
-    """USDA ERP trigger rule (see erp.py): a county that triggers gets the training mean share of triggering rows (liability-weighted, per state x
-    crop), so its predicted cost is proportional to liability; every other county gets 0. Calibrated afterwards like every model."""
-    name = "B2"
+class Z0:
+    """Predict zero."""
+    name = "Z0"
+
+    def fit(self, train, target):
+        return self
+
+    def predict(self, df):
+        return np.zeros(len(df))
+
+
+class B2a:
+    """USDA binary trigger (see erp.py): a county that triggers gets the training mean share of triggering rows (liability-weighted, per state x
+    crop), so its predicted cost is proportional to liability; every other county gets 0."""
+    name = "B2a"
 
     def fit(self, train, target):
         t = train.assign(_y=y_train(train, target))
@@ -81,4 +90,43 @@ class B2:
         base = np.array([self.table_.get(k, self.global_) for k in zip(df.state_alpha, df.crop)])
         return base * (df.erp_trigger.to_numpy() == 1)
 
-    score = predict
+
+class B2b:
+    """Tiered LFP-style trigger (see erp.py): allocation = tier weight x liability x c, c fitted on the training rows that have a tier."""
+    name = "B2b"
+
+    def fit(self, train, target):
+        t = train[train.erp_tier > 0]
+        y = y_train(t, target)
+        den = (t.erp_tier * t.liability).sum()
+        self.c_ = float((y * t.liability).sum() / den) if den > 0 else 0.0
+        return self
+
+    def predict(self, df):
+        return self.c_ * df.erp_tier.to_numpy(float)
+
+
+class B3:
+    """Liability only: the same share for every row (training liability-weighted mean), i.e. payout proportional to liability."""
+    name = "B3"
+
+    def fit(self, train, target):
+        self.c_ = _wmean(y_train(train, target), train.liability)
+        return self
+
+    def predict(self, df):
+        return np.full(len(df), self.c_)
+
+
+class B4:
+    """Liability x the D2+ area share on the last map (d2_pct_last_map): share = c x d2_pct_last_map / 100, c fitted on the training rows."""
+    name = "B4"
+
+    def fit(self, train, target):
+        d2 = train.d2_pct_last_map.fillna(0).to_numpy() / 100
+        den = (train.liability.to_numpy() * d2).sum()
+        self.c_ = float((y_train(train, target) * train.liability.to_numpy()).sum() / den) if den > 0 else 0.0
+        return self
+
+    def predict(self, df):
+        return self.c_ * df.d2_pct_last_map.fillna(0).to_numpy() / 100

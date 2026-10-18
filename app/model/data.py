@@ -18,20 +18,26 @@ KEY = ["fips", "crop", "year"]
 T1, T2 = "drought_payout_share", "drought_loss_acre_share"
 TARGETS = {"T1": T1, "T2": T2}
 
-DROUGHT = ["d2_weeks_50pct", "d3_weeks_50pct", "d2_max_pct", "dsci_mean", "d2_pct_last_map", "d3_pct_last_map"]
-WEATHER = ["precip_ratio_vs_normal", "heat32_days", "heat35_days", "tmax_jul_mean", "gdd"]
+DROUGHT_OLD = ["d2_weeks_50pct", "d3_weeks_50pct", "d2_max_pct", "dsci_mean", "d2_pct_last_map", "d3_pct_last_map"]
+DROUGHT_NEW = ["d0_pct_last_map", "d1_pct_last_map", "d1_pct_change_4wk", "dsci_change_4wk"]
+WEATHER_OLD = ["precip_ratio_vs_normal", "heat32_days", "heat35_days", "tmax_jul_mean", "gdd"]
+WEATHER_NEW = ["precip_30d_ratio"]
 SOIL = ["aws_100cm_mm", "droughty_pct", "nccpi"]
-IRRIGATION = ["irr_share_train_mean", "irr_known"]
+IRRIGATION = ["irr_share_prior_mean", "irr_known"]
 HISTORY = ["acres_planted_prev3_mean", "yield_prev5_mean"]
+DROUGHT = DROUGHT_OLD + DROUGHT_NEW
+WEATHER = WEATHER_OLD + WEATHER_NEW
+NUMERIC_OLD = DROUGHT_OLD + WEATHER_OLD + SOIL + IRRIGATION + HISTORY        # pre-revision column list (corrected definitions), for the ablation
 NUMERIC = DROUGHT + WEATHER + SOIL + IRRIGATION + HISTORY
 CATEGORY = ["is_soybeans", "is_ne"]            # dummies built from crop and state_alpha
 FEATURES = NUMERIC + CATEGORY
+FEATURES_OLD = NUMERIC_OLD + CATEGORY
 
 # Never features: identifiers, the year, and anything from labels.csv. precip_mm is redundant with the ratio.
 FORBIDDEN = {"fips", "year", "county_name", "precip_mm", "decision_date", T1, T2}
 
 # columns carried along for evaluation and the budget arithmetic (never fed to a model)
-CARRY = ["county_name", "state_alpha", "liability", "insured_acres", "avg_coverage", "full_crop_value",
+CARRY = ["erp_trigger", "erp_tier", "d2_pct_last_map", "county_name", "state_alpha", "liability", "insured_acres", "avg_coverage", "full_crop_value",
          "drought_indemnity", "drought_loss_acres", "out_of_pocket_drought_loss", "relief_gap_to_95pct"]
 
 
@@ -62,8 +68,8 @@ def load_split(split, allow_test=False):
     assert df.fips.str.len().eq(5).all(), "fips must stay 5-character text"
     from erp import erp_trigger                      # B2 only; not in FEATURES
     flag = erp_trigger(int(df.year.min()), int(df.year.max()))
-    df = df.merge(flag[["fips", "year", "erp_trigger"]], on=["fips", "year"], how="left")
-    df["erp_trigger"] = df.erp_trigger.fillna(0).astype(int)
+    df = df.merge(flag[["fips", "year", "erp_trigger", "erp_tier"]], on=["fips", "year"], how="left")
+    df[["erp_trigger", "erp_tier"]] = df[["erp_trigger", "erp_tier"]].fillna(0).astype(int)
     df["is_soybeans"] = (df.crop == "SOYBEANS").astype(int)
     df["is_ne"] = (df.state_alpha == "NE").astype(int)
     assert_no_leak(FEATURES)

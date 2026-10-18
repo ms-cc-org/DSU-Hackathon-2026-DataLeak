@@ -1,86 +1,57 @@
-# Drought cost model (implements MODEL_PLAN.md)
+# Drought cost model
 
-Predicts, from what is known on Aug 15, what a drought costs each Iowa / Nebraska county (corn, soybeans)
-and turns it into a relief budget. Only pandas, numpy, scikit-learn (see `requirements.txt`).
-This file documents the model code; the repo's main README.md is untouched.
+Predicts, from what is known on Aug 15, what a drought costs each Iowa / Nebraska county (corn, soybeans) and turns it into a budget picture. This file documents the model code;
+the repo's main README.md is untouched. Decisions are logged, in order, in [DECISIONS.md](DECISIONS.md); the external audit is in [results/AUDIT_REPORT.md](results/AUDIT_REPORT.md).
 
-## Run it (from the repo root, venv active)
+**Wording.** X = estimated insurance payouts (predicted payout share x insured liability). Y = estimated deductible exposure. Z = illustrative relief allocation under a 95% coverage
+assumption (inspired by USDA ERP 2022); it is not a prediction of any program payment.
+
+## Run it (repo root, venv active)
 
 ```bash
-python app/model/evaluate.py                  # tune, walk-forward + validation -> results/validation_report.md (+ validation_results.csv)
-python app/model/final_test.py --i-am-sure    # ONCE, at the very end: reads testing/ -> results/test_report.md  (run as a script; `python -m app.model...` does not work)
+python organize_usda_data.py --downloads ~/Downloads --repo . --out ./usda_budget_data   # rebuild the data from the RMA files
+python app/model/evaluate.py                  # tune, walk-forward 2006-2012 + validation 2013-2015 -> results/validation_report.md
+python app/model/final_test.py --i-am-sure    # ONCE, only when told to: reads the held-out 2016-2025 data -> results/test_report.md
 ```
-`final_test.py` refuses to run without `--i-am-sure`, and `data.load_split("testing")` raises unless that flag path
-is used. `evaluate.py` never touches `testing/`. Data folder: `$USDA_DATA_DIR`, else `<repo>/usda_budget_data`,
-else `<repo>/app/usda_budget_data`.
+`final_test.py` refuses to run without `--i-am-sure`; `data.load_split("testing")` raises otherwise. Run it as a script (`python -m app.model...` does not work: `app/` is not a package
+and the root `data/` folder would shadow `data.py`). Data folder: `$USDA_DATA_DIR`, else `<repo>/usda_budget_data`, else `<repo>/app/usda_budget_data`. `usda_budget_data/testing/` is gitignored.
+
+## Models
+
+| Name | What it is |
+|---|---|
+| Z0 | predict zero |
+| B1 | drought-bin average (state x crop x `d2_weeks_50pct` bin, isotonic), fitted on the fold's training rows |
+| B2a | USDA binary trigger: D2+ on any part of the county for 8 consecutive weekly maps, or any D3+ (maps Apr 1 - Aug 13); `erp.py` |
+| B2b | tiered LFP-style trigger: weight 1 = D2 for 8 consecutive weeks, 3 = any D3, 4 = D3 for 4+ weeks or any D4, 5 = D4 for 4+ weeks; allocation = weight x liability |
+| B3 | liability only (same share for every row) |
+| B4 | liability x D2+ area share on the last map |
+| A | two-part hurdle model (`hurdle.py`) |
+| B | gradient boosting, Poisson loss, monotone constraints (`gbm.py`) |
+| C | k nearest historical look-alikes (`analog.py`) |
+| D | Tweedie GLM, power 1.5 (`tweedie.py`) |
+
+G (TabPFN v2, `tabpfn_model.py`) is an experiment only (too slow on CPU, not bit-reproducible on the GPU); see `results/g_deployability.json` and the report's section 9.
+Targets: T1 payout share (X), T2 damaged-acre share. Sample weight = liability.
+
+## Protocol (fixed before running, see DECISIONS.md Entries 3-4)
+
+- Out-of-sample years 2006-2015: walk-forward 2006-2012 (fit on years < Y) and validation 2013-2015 (fit on 2000-2012). Hyper-parameters are tuned on walk-forward only.
+- Fold safety: imputers, scalers, bins, look-alike pools are fitted inside `fit()`; rain normals and irrigation averages in the data use strictly earlier years only; drought maps only if released by Aug 15 (map_date <= Aug 13).
+- Nested calibration: the multiplier for year Y comes only from earlier years; kept for a model-target only if it lowers statewide absolute error (`results/calibration.csv`).
+- Historical scenario range (rough 10th-90th percentile of past outcomes): A, B, D resample whole earlier years' residuals (years < Y, at least 3); C uses its look-alikes' spread. `budget.statewide_range()` returns the best-covering method widened to contain the headline model's point estimate.
+- Headline rule: among A, B, C, D the lowest statewide absolute $ error on drought state-years, provided top-20 capture beats B3 and B4; ties within 5% go to the simpler model (D < A < C < B).
+- Metrics, overall and for drought state-years only: statewide absolute $ error, $ under-budgeted, worst state-year shortfall, county WAPE, top-20 county capture (counties, crops summed; ties by FIPS), best possible capture, calibration, AUC (the model's own predicted amount), for T1, T2 and Z.
 
 ## Files
 
-| File | Role |
-|---|---|
-| `data.py` | load + join (`fips` always text) + filter + feature list, `Preprocessor` (median impute, missing flags, standardise) |
-| `baselines.py` | B0 (state x crop mean), B1 (state x crop x `d2_weeks_50pct` bin, isotonic) |
-| `hurdle.py` | Strategy A: logistic P(cost > 0) x log-linear amount, smearing, coefficients |
-| `gbm.py` | Strategy B: `HistGradientBoostingRegressor(loss="poisson")` with monotonic constraints (+ `GBMDollars`, a report-only side check) |
-| `tweedie.py` | Strategy D: `TweedieRegressor(power=1.5, link="log")`, liability-weighted, standardised + imputed + missing flags, alpha tuned in {0.01, 0.1, 1.0} |
-| `tabpfn_model.py` | Strategy G (optional, needs `pip install tabpfn`): TabPFN v2 regressor; no sample weights; Built with PriorLabs-TabPFN (v2 weights: Prior Labs License 1.1, Apache 2.0 + attribution; v2.5/v2.6 weights are non-commercial and not used; no Hugging Face login needed) |
-| `analog.py` | Strategy C: k nearest training county-years (same crop), neighbour range + explanation |
-| `evaluate.py` | tuning, walk-forward 2006-2012, validation 2013-2015, metrics, model choice, report |
-| `final_test.py` | plan section 5 |
-| `budget.py` | plan sections 6-7: X, Y, Z, calibration factors, ranges (`statewide_range`), extrapolation warning (import this from Streamlit) |
-| `results/` | generated reports and csv files |
+`data.py` (loading, feature lists), `erp.py` (trigger flags), `baselines.py`, `hurdle.py`, `gbm.py`, `analog.py`, `tweedie.py`, `evaluate.py`, `final_test.py`, `budget.py` (X, Y, Z arithmetic, calibration factors, ranges, extrapolation warning; import this from the app),
+`results/` (reports and csv files), `DECISIONS.md`.
 
-Each model has `fit(train, target)`, `predict(df)` (expected share) and `score(df)` (ranking score).
-Targets: T1 `drought_payout_share`, T2 `drought_loss_acre_share`. Sample weight = `liability`.
+## Known limitations
 
-## Calibration
-
-Each model x target (T1 payout share, T2 damaged-acre share) gets k = Σ actual / Σ predicted, computed from that model's WALK-FORWARD
-predictions (2006-2012) only and saved in `results/calibration.csv`. Predictions are multiplied by k in `evaluate.py`, `final_test.py` and
-`budget.py` (`calibrate`, `calibrated_components`). It is a constant per model, so budget capture and AUC cannot change (checked). Walk-forward
-"after" numbers are in-sample for k; validation is the honest test. Because k is dominated by the 2012 drought it over-corrects quiet years
-(B0 and B1 get worse on validation). `budget.statewide_range()` returns the chosen model's calibrated statewide point estimate and a rough
-10th-90th percentile range (the best-covering method, currently C's look-alike spread), widened when the point estimate falls outside it.
-
-## Choices made where the plan left room
-
-- Rows: `insured == True`, `liability > 0`, `rma_year_available`; zero payouts kept. Five training rows have tiny negative
-  payout shares (reversals, about 0.0005% of dollars): clipped to 0 for fitting, actuals untouched in evaluation.
-- A: balanced class weights as specified, then the intercept is shifted back to the real base rate so P is a real
-  probability. Part 2 uses a ridge penalty of 1 on standardised features (about OLS here) because the drought columns are collinear.
-- Tuning criterion (fixed in advance): pooled walk-forward county-year dollar WAPE of T1. Grid: B `max_iter` {100,200,400} x
-  `max_depth` {3,4}; C `k` {10,25,50} x drought-feature weight {1,2,3}.
-- "Drought year" in reports = state-year whose actual statewide drought payout is >= 3% of insured dollars (grouping only).
-- Model choice rule (fixed in advance): among A/B/C, near-best = top-20 capture within 0.02 and WAPE within 5% of the best;
-  take the simplest near-best (A over C over B). `results/chosen_model.json` records the outcome.
-- Ranges (rough 10th-90th percentile): A and B resample WHOLE past years' residuals (walk-forward 2006-2012; every county of a year
-  moves together, never row by row); C uses its look-alikes' liability-weighted 10th-90th percentile with all counties at the same
-  quantile. The method closest to 80% coverage on walk-forward + validation is written to `results/range_method.json` and used by
-  `budget.statewide_range()`, always labelled rough. Nothing is tuned to reach 80%.
-- Known miss, not tuned for: Iowa 2013 (drought began after Aug 15). Expected miss in the final test: Iowa 2020 derecho (wind).
-
-## Leakage checklist (plan section 8)
-
-- [x] No labels column is a feature: `data.FEATURES` is an explicit list; `assert_no_leak` rejects `FORBIDDEN` names.
-- [x] Inputs are already clipped to before Aug 15 by `organize_usda_data.py`; nothing else is added.
-- [x] Scalers, imputers, bins, neighbour pools are fitted inside `fit()` on the training rows of that fold only.
-- [x] `fips`, `year`, county name are never features.
-- [x] `testing/` untouched until `final_test.py --i-am-sure`.
-- Budget arithmetic (`budget.py`) uses `liability`, `insured_acres`, `avg_coverage`, `full_crop_value` from labels.csv; these are
-  Aug-15 exposure numbers used after prediction, never as model inputs.
-
-## What the validation run showed (full tables in `results/validation_report.md`, calibrated predictions)
-
-See the report for walk-forward, validation and pooled tables (A), drought vs quiet years (B), per state-year totals with ranges (C), both
-targets (D), known misses (E), the verdict (F) and the report-only dollar-target side check (G). Points to keep in mind:
-
-- Boosting (B) and the hurdle model (A) have the same budget capture (about 44%, random 21.5%, B1 29%); B has lower dollar error before
-  calibration. After calibration the plan's rule (simpler model if within noise) selects A, but that comes mostly from k being fitted
-  in-sample on 2012; on validation alone A and B are tied. Treat the A-vs-B choice as open.
-- Only three of the 20 out-of-sample state-years are drought years (Iowa and Nebraska 2012, Iowa 2013).
-- Iowa 2013 is missed by every model: the drought began after Aug 15 (statewide D2+ area 0% from May 28 through Aug 13, 21% on Aug 27,
-  42% on Sep 10). Not tuned for, and a constant calibration factor cannot fix it.
-- Ranges are rough: whole-year resampling of 7 walk-forward years gives A and B narrow, lopsided ranges (about 40-45% coverage); the
-  look-alike spread (C) reaches 80% pooled (16/20; only 6 validation state-years).
-- `yield_prev5_mean` / `acres_planted_prev3_mean` are missing only for 2000-2002, so A's missing-flag columns (and B's native
-  NaN splits) can act as a weak year proxy during training.
+- Only 3 of the 20 out-of-sample state-years are drought years (Iowa and Nebraska 2012, Iowa 2013); drought-year numbers are anecdotes.
+- Iowa 2013 is an emerging drought (D1+ 34% on the Aug 13 map) that intensified after the forecast date; no model sees it.
+- `yield_prev5_mean`, `acres_planted_prev3_mean` and the first two years' rain normals are missing in 2000-2002, so their missing flags can act as weak year proxies.
+- Hyper-parameters are tuned on the same walk-forward folds that are reported (slightly optimistic).
+- Ranges are rough: A, B, D ranges exist only from 2009 and cover poorly; C's range is wide.
