@@ -1,0 +1,3 @@
+,flagged county-crop-years,significant county-crop-years,true positives,precision,recall
+B2a trigger,273.0,200.0,79.0,0.2893772893772894,0.395
+D Tweedie GLM (top N),276.0,200.0,79.0,0.286231884057971,0.395

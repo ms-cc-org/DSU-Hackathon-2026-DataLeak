@@ -1,0 +1,44 @@
+{
+  "device": "cpu",
+  "cpu_count": 8,
+  "torch_threads": 8,
+  "torch": "2.14.1",
+  "python": "3.13.2",
+  "machine": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "train_rows": 4734,
+  "predict_rows": 367,
+  "n_estimators": 8,
+  "tabpfn_version": "9.2.0",
+  "load_and_fit_seconds_t1": 0.42,
+  "load_and_fit_seconds_t2": 0.36,
+  "predict_seconds_runs": [
+    {
+      "t1": 130.95,
+      "t2": 155.56,
+      "sum": 286.51
+    },
+    {
+      "t1": 163.33,
+      "t2": 189.28,
+      "sum": 352.61
+    },
+    {
+      "t1": 164.97,
+      "t2": 190.04,
+      "sum": 355.02
+    }
+  ],
+  "predict_seconds_t1_median": 163.33,
+  "predict_seconds_t2_median": 189.28,
+  "predict_seconds_sum_t1_t2_median": 352.61,
+  "cpu_predictions_bit_identical_across_runs": true,
+  "limit_seconds": 10,
+  "under_limit": false,
+  "mps_check": {
+    "device": "mps",
+    "runs": 3,
+    "bit_identical_across_runs": false,
+    "max_abs_diff_predicted_share": 0.0011134461240293464,
+    "note": "fit+predict T1 for 2013, same data, same random_state"
+  }
+}
