@@ -66,4 +66,9 @@ For 2016–2025, replay uses `d_test.joblib` and labels its estimates `out-of-sa
 
 ## Reporting boundary
 
+| Additional output key in `scenario()` and `replay()` | Meaning and unit |
+|---|---|
+| `reserve_band_x_usd` | Planning range from D's past statewide X misses: 5th–95th percentile of actual / D over out-of-sample 2006–2015, evaluated after the official test; not a guaranteed interval. Scenario returns `plan_usd`, `low_usd`, `high_usd`, `label`, and `source_years` (`2006-2015`) after `acres_scale × price_scale`; replay returns the same dictionaries keyed by state. Applies only to statewide X. |
+
+
 The existing official report evaluates Iowa and Nebraska, corn and soybeans together. `app/model/results/iowa_corn_test_slice.md` compares D, B2a and B2b on Iowa corn only using existing saved test predictions, with no retraining. Any Lane 3 allocation rule must label its source amount and must not relabel X as total crop-value loss or Z as an actual government payment.
