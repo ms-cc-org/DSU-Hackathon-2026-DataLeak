@@ -4,10 +4,12 @@
   "pooled_coverage": {
     "A": 0.45,
     "B": 0.4,
-    "C": 0.8
+    "C": 0.8,
+    "D": 0.45,
+    "G": 0.4
   },
   "target": 0.8,
-  "chosen_point_inside_range": "18/20",
+  "chosen_point_inside_range": "20/20",
   "budget_range_coverage_pooled": 0.8,
   "note": "no method is tuned to hit 80%; the closest on calibrated walk-forward + validation is used, widened to include the chosen model's point estimate, and labelled rough"
 }
