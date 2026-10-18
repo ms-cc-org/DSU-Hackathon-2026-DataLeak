@@ -175,7 +175,7 @@ def _cropArrays(history: pd.DataFrame, asof: pd.Series) -> dict:
         "weeks": [jsonNumber(v, 0) for v in history["weeks_d2_plus"]],   # full crop season (master)
         "asof": [jsonNumber(asof.get((fips, y)), 0) for y in YEARS],     # season start to Aug 15
         "nccpi": jsonNumber(history["nccpi"].iloc[0], 2),
-        "trendCoef": None if pd.isna(slope) else [round(slope, 4), round(intercept, 2)],
+        "trendCoef": None if pd.isna(slope) else [round(slope, 7), round(intercept, 4)],
     }
 
 
@@ -288,7 +288,7 @@ def viewerHtml(mode: str = "history", focusFips: str = DEFAULT_FIPS, startYear: 
 
 
 def showViewer(mode: str = "history", focusFips: str = DEFAULT_FIPS, startYear: int = 2012,
-               crop: str = "CORN", price: float | None = None, height: int = 800) -> None:
+               crop: str = "CORN", price: float | None = None, height: int = 760) -> None:
     """Embed the 3D viewer at full width.
     Mode 1: showViewer("history", fips, year, crop, price). Mode 2: showViewer("sandbox", fips).
     price starts the viewer's price input for that crop (an assumed price)."""

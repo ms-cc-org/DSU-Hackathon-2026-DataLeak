@@ -1,4 +1,8 @@
+
+"""Superseded by the Planner tab (web/pages/3_planner.py); kept on disk, not registered in app.py."""
+=======
 """Historical-footprint scenario UI backed by the fitted Lane 2 engine."""
+
 
 from __future__ import annotations
 

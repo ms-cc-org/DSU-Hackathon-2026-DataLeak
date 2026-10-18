@@ -29,137 +29,182 @@
 -->
 <script type="importmap">__IMPORT_MAP__</script>
 <style>
+  /* Fonts are served by Streamlit from static/fonts/; system fonts are the fallback. */
+  @font-face { font-family: "Bricolage Grotesque"; font-weight: 700; src: url("/app/static/fonts/bricolage-grotesque-latin-700-normal.woff2") format("woff2"); }
+  @font-face { font-family: "DM Sans"; font-weight: 400; src: url("/app/static/fonts/dm-sans-latin-400-normal.woff2") format("woff2"); }
+  @font-face { font-family: "DM Sans"; font-weight: 500; src: url("/app/static/fonts/dm-sans-latin-500-normal.woff2") format("woff2"); }
+  @font-face { font-family: "DM Sans"; font-weight: 700; src: url("/app/static/fonts/dm-sans-latin-700-normal.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 400; src: url("/app/static/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 500; src: url("/app/static/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
   :root {
-    --bg: #0d1117;
-    --panel: #121821;
-    --glass: rgba(14, 18, 24, 0.78);
-    --line: rgba(255, 255, 255, 0.13);
-    --text: #e8ecf1;
-    --muted: #a3adb8;
-    --accent: #f0b429;
+    --ground: #0E1318; --panel: #151C23; --line: #26313B; --text: #E8E4DA; --text2: #B9C0C7; --muted: #8E9AA5;
+    --amber: #F2A33A; --glass: rgba(14, 19, 24, 0.82);
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --display: "Bricolage Grotesque", "DM Sans", system-ui, sans-serif;
   }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--ground); color: var(--text);
+    font: 14px/1.45 "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
   button, select, input { font: inherit; color: var(--text); }
-  button { background: rgba(255,255,255,0.07); border: 1px solid var(--line); border-radius: 7px;
-    padding: 5px 10px; cursor: pointer; }
-  button:hover { background: rgba(255,255,255,0.14); }
-  button.on { background: rgba(240,180,41,0.22); border-color: rgba(240,180,41,0.6); }
+  button { background: transparent; border: 1px solid var(--line); border-radius: 999px; min-height: 36px;
+    padding: 6px 14px; cursor: pointer; }
+  button:hover { border-color: var(--amber); }
+  button.on, button.amber { background: var(--amber); border-color: var(--amber); color: var(--ground); font-weight: 700; }
   button:disabled { opacity: 0.4; cursor: default; }
-  select, input[type=number] { background: rgba(255,255,255,0.08); border: 1px solid var(--line);
-    border-radius: 6px; padding: 5px 7px; width: 100%; box-sizing: border-box; }
-  select option { background: #1b222c; }
-  input[type=range] { accent-color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  select, input[type=number] { background: var(--ground); border: 1px solid var(--line); border-radius: 12px;
+    padding: 8px 10px; width: 100%; box-sizing: border-box; min-height: 40px; }
+  select option, select optgroup { background: var(--panel); }
   .hidden { display: none !important; }
   .muted { color: var(--muted); }
-  .small { font-size: 11.5px; }
-  h3 { margin: 14px 0 6px; font-size: 13px; letter-spacing: .02em; }
+  .small { font-size: 12px; }
+  .mono { font-family: var(--mono); }
+  h3 { margin: 16px 0 8px; font: 700 15px var(--display); letter-spacing: .01em; }
   h3:first-child { margin-top: 0; }
 
-  /* Two rows: a banner strip on top, then canvas + side panel side by side. */
-  #app { display: flex; flex-direction: column; height: 100%; }
-  #topbar { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
-    padding: 7px 10px; border-bottom: 1px solid var(--line); }
-  .banner { padding: 3px 9px; border-radius: 6px; font-weight: 600; font-size: 12px; }
-  .banner.proto { background: rgba(240,180,41,0.92); color: #1d1600; }
-  .banner.fake { background: rgba(200,40,40,0.95); color: #fff; }
-  .banner.note { background: rgba(255,255,255,0.08); color: var(--muted); font-weight: 500; }
-  #title { font-weight: 650; font-size: 14px; }
-  #panelBtn { margin-left: auto; }
-  #main { flex: 1 1 auto; display: flex; min-height: 0; }
-  #stageWrap { flex: 1 1 auto; position: relative; min-width: 0; overflow: hidden; }
+  /* Canvas column (scene + year card) beside a 360px side panel that never covers the scene. */
+  #main { display: flex; gap: 12px; height: 100%; box-sizing: border-box; }
+  #leftCol { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  #stageWrap { flex: 1 1 auto; min-height: 260px; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 22px; }
   #stage { position: absolute; inset: 0; }
   #stage canvas { display: block; touch-action: none; }
-  #panel { flex: 0 0 340px; width: 340px; box-sizing: border-box; overflow-y: auto; padding: 12px 14px;
-    background: var(--panel); border-left: 1px solid var(--line); }
+  #panel { flex: 0 0 360px; width: 360px; box-sizing: border-box; display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; }
+  #panelHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 8px; }
+  .modeSwitch { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+  .modeSwitch button { border: 0; min-height: 34px; }
+  #title { padding: 0 14px 6px; font: 700 18px/1.25 var(--display); }
+  #panelBody { flex: 1 1 auto; overflow-y: auto; padding: 6px 14px 12px; }
+  #panelFoot { border-top: 1px solid var(--line); padding: 10px 14px; color: var(--muted); font: 11.5px/1.45 var(--mono); }
   body.panel-hidden #panel { display: none; }
-  /* Mid-size frames (a laptop with the Streamlit sidebar open): slightly narrower panel. */
-  @media (min-width: 601px) and (max-width: 860px) { #panel { flex-basis: 300px; width: 300px; } }
+  #showPanelBtn { position: absolute; top: 10px; right: 10px; z-index: 5; }
+  body:not(.panel-hidden) #showPanelBtn { display: none; }
+  .banner.fake { display: block; margin: 0 14px 8px; padding: 6px 10px; border-radius: 12px; background: #8C2F2F; color: #fff;
+    font: 700 12px var(--mono); letter-spacing: .04em; }
 
-  /* Small floating controls: only these sit over the canvas. */
-  .float { position: absolute; background: var(--glass); border: 1px solid var(--line); border-radius: 9px;
+  /* Small floating controls on the canvas: camera views, the hint, tooltips. */
+  .float { position: absolute; background: var(--glass); border: 1px solid var(--line); border-radius: 999px;
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-  #cams { top: 10px; left: 10px; display: flex; gap: 6px; padding: 6px; }
-  #timeline { left: 50%; transform: translateX(-50%); bottom: 40px; display: flex; gap: 10px; align-items: center;
-    padding: 6px 10px; width: min(520px, calc(100% - 40px)); box-sizing: border-box; }
-  #yearSlider { flex: 1; }
-  #yearLabel { font-size: 16px; font-weight: 650; width: 44px; text-align: center; }
-  #hint { left: 10px; bottom: 8px; padding: 4px 9px; font-size: 11.5px; color: var(--muted); }
-  #tooltip { pointer-events: none; padding: 7px 9px; font-size: 12px; z-index: 20; max-width: 240px; }
-  #toast { left: 50%; top: 56px; transform: translateX(-50%); padding: 6px 12px; z-index: 30; }
+  #cams { top: 10px; left: 10px; display: flex; gap: 4px; padding: 4px; }
+  #cams button { border: 0; min-height: 36px; }
+  #hint { left: 10px; bottom: 10px; padding: 5px 12px; font: 11.5px var(--mono); color: var(--text2); }
+  #tooltip { pointer-events: none; padding: 8px 11px; font-size: 12.5px; z-index: 20; max-width: 250px; border-radius: 14px; }
+  #toast { left: 50%; top: 56px; transform: translateX(-50%); padding: 6px 14px; z-index: 30; }
+
+  /* Year card: Play + year, one bar per year, the slider aligned under the bars, tick labels. */
+  #yearCard { flex: 0 0 auto; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 12px 18px 10px; }
+  body.mode-sandbox #yearCard { display: none; }
+  .yearRow { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  #playBtn { min-width: 84px; min-height: 40px; }
+  #yearLabel { font: 500 30px/1 var(--mono); color: var(--amber); font-variant-numeric: tabular-nums; }
+  #yearMeta { margin-left: auto; font: 11.5px var(--mono); color: var(--muted); text-align: right; }
+  #yearTrack { position: relative; --gap: 2px; --bw: calc((100% - 25 * var(--gap)) / 26); }
+  #yearBars { display: flex; gap: var(--gap); height: 46px; align-items: flex-end; }
+  .yb { flex: 1 1 0; height: 100%; border-radius: 4px; cursor: pointer; box-sizing: border-box; transition: transform .15s ease; }
+  .yb:hover { transform: translateY(-2px); }
+  .yb.nodata { height: 30%; background: #2A333C; }
+  .yb.sel { outline: 2px solid #E8E4DA; outline-offset: 1px; }
+  /* The slider's thumb (16px) travels from the first bar's center to the last bar's center. */
+  #yearSlider { -webkit-appearance: none; appearance: none; background: transparent; display: block; height: 22px; margin: 6px 0 0;
+    width: calc(100% - var(--bw) + 16px); margin-left: calc((var(--bw) - 16px) / 2); }
+  #yearSlider::-webkit-slider-runnable-track { height: 2px; background: var(--line); border-radius: 2px; }
+  #yearSlider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -7px; border-radius: 50%; background: var(--amber); border: 0; }
+  #yearSlider::-moz-range-track { height: 2px; background: var(--line); }
+  #yearSlider::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--amber); border: 0; }
+  #yearTicks { position: relative; height: 16px; font: 11px var(--mono); color: var(--muted); }
+  #yearTicks span { position: absolute; transform: translateX(-50%); }
 
   /* Side panel content */
   table.kv { width: 100%; border-collapse: collapse; }
-  table.kv td { padding: 2px 0; vertical-align: top; }
-  table.kv td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
-  #chart { width: 100%; height: 120px; display: block; margin-top: 6px; }
-  .warn { background: rgba(240,180,41,0.14); border: 1px solid rgba(240,180,41,0.5); border-radius: 7px;
-    padding: 6px 8px; margin: 8px 0; }
-  .field { margin: 8px 0; }
-  .field label { display: block; margin-bottom: 3px; color: var(--muted); }
-  .big { font-size: 20px; font-weight: 650; }
+  table.kv td { padding: 4px 0; vertical-align: top; border-bottom: 1px solid rgba(38,49,59,.6); }
+  table.kv td:last-child { text-align: right; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  #chart { width: 100%; height: 120px; display: block; margin-top: 8px; }
+  .warn { background: rgba(242,163,58,0.12); border: 1px solid rgba(242,163,58,0.5); border-radius: 12px; padding: 8px 10px; margin: 8px 0; }
+  .field { margin: 10px 0; }
+  .field label { display: block; margin-bottom: 4px; color: var(--muted); font: 11.5px var(--mono); letter-spacing: .04em; }
+  .big { font: 500 22px var(--mono); color: var(--amber); }
   .bars .bar { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
-  .bars .track { flex: 1; height: 9px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
-  .bars .fill { height: 100%; background: var(--accent); }
+  .bars .track { flex: 1; height: 9px; background: var(--ground); border-radius: 999px; overflow: hidden; }
+  .bars .fill { height: 100%; background: var(--amber); }
   .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px; vertical-align: -1px; margin-right: 4px; }
+  #scopeRow { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  #scopeRow button { min-height: 32px; padding: 4px 11px; font-size: 12.5px; }
 
-  /* Loading, fade and fallback cover the canvas area only. */
-  #loading { position: absolute; inset: 0; background: var(--bg); display: flex; flex-direction: column;
+  /* Loading, fade and fallback cover the canvas only. */
+  #loading { position: absolute; inset: 0; background: var(--ground); display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 12px; z-index: 50; transition: opacity .5s; }
-  #bar { width: 260px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
-  #barFill { height: 100%; width: 0%; background: var(--accent); transition: width .2s; }
-  #fade { position: absolute; inset: 0; background: var(--bg); opacity: 0; pointer-events: none;
-    transition: opacity .25s; z-index: 40; }
+  #bar { width: 260px; height: 4px; background: var(--line); border-radius: 999px; overflow: hidden; }
+  #barFill { height: 100%; width: 0%; background: var(--amber); transition: width .2s; }
+  #fade { position: absolute; inset: 0; background: var(--ground); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 40; }
   #fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    padding: 40px; text-align: center; z-index: 60; background: var(--bg); }
+    padding: 40px; text-align: center; z-index: 60; background: var(--ground); }
 
-  /* Narrow screens (phones): the side panel stacks below the canvas. */
-  @media (max-width: 600px) {
-    #main { flex-direction: column; }
-    #stageWrap { flex: 0 0 58%; }
-    body.panel-hidden #stageWrap { flex: 1 1 auto; }
-    #panel { flex: 1 1 auto; width: auto; border-left: 0; border-top: 1px solid var(--line); }
+  /* Narrow screens (phones): the page scrolls, the panel stacks below the year card. */
+  @media (max-width: 760px) {
+    html, body { overflow-y: auto; }
+    #main { flex-direction: column; height: auto; }
+    #stageWrap { flex: 0 0 360px; }
+    #panel { flex: 0 0 auto; width: auto; overflow: visible; }
+    #panelBody { overflow: visible; }
     #hint { display: none; }
-    #timeline { bottom: 8px; }
+    #yearCard { padding: 10px 12px 8px; }
+    #yearTrack { --gap: 1px; }
+    #yearLabel { font-size: 24px; }
+    #yearMeta { display: none; }
   }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
-<div id="app">
-  <div id="topbar">
-    <span class="banner proto">PROTOTYPE - one county shown to illustrate the final design</span>
-    <span id="fakeBanner" class="banner fake hidden">PLACEHOLDER DATA - NOT REAL RESULTS</span>
-    <span id="title"></span>
-    <span class="banner note">Illustrative scene - not a map of fields. The data has no field-level detail.</span>
-    <span id="scenarioLabel" class="banner note hidden">Scenario - illustration, not a validated prediction.</span>
-    <button id="panelBtn">Hide panel</button>
-  </div>
-  <div id="main">
+<div id="main">
+  <div id="leftCol">
     <div id="stageWrap">
       <div id="stage"></div>
-      <div id="cams" class="float">
+      <div id="cams" class="float" role="toolbar" aria-label="Camera views">
         <button data-cam="state">State</button>
         <button data-cam="aerial">Aerial</button>
         <button data-cam="soil">Soil Cutaway</button>
       </div>
-      <div id="timeline" class="float hidden">
-        <button id="playBtn">Play</button>
-        <input type="range" id="yearSlider" min="2000" max="2025" step="1" value="2012">
-        <div id="yearLabel">2012</div>
-      </div>
-      <div id="hint" class="float">Drag to orbit - scroll to zoom - right-drag to pan <span id="fps"></span></div>
+      <button id="showPanelBtn" class="float">Show panel</button>
+      <div id="hint" class="float">Drag to orbit · scroll to zoom · keys 1-3, space <span id="fps"></span></div>
       <div id="tooltip" class="float hidden"></div>
       <div id="toast" class="float hidden"></div>
       <div id="fade"></div>
       <div id="loading">
-        <div style="font-size:15px;font-weight:600">Building the scene...</div>
+        <div style="font: 700 16px var(--display)">Building the scene...</div>
         <div id="bar"><div id="barFill"></div></div>
-        <div class="muted small" id="loadingStep">Loading Three.js</div>
+        <div class="muted small mono" id="loadingStep">Loading three.js</div>
       </div>
       <div id="fallback" class="hidden"></div>
     </div>
-    <aside id="panel"></aside>
+    <div id="yearCard">
+      <div class="yearRow">
+        <button id="playBtn" class="amber" aria-label="Play or pause the years">Play</button>
+        <div id="yearLabel">2012</div>
+        <div id="yearMeta">Max drought level by year<br>grey = no reported yield</div>
+      </div>
+      <div id="yearTrack">
+        <div id="yearBars" aria-hidden="true"></div>
+        <input type="range" id="yearSlider" min="2000" max="2025" step="1" value="2012" aria-label="Year">
+        <div id="yearTicks"></div>
+      </div>
+    </div>
   </div>
+  <aside id="panel">
+    <div id="panelHead">
+      <div class="modeSwitch" role="tablist" aria-label="Mode">
+        <button data-mode="history" role="tab">History</button>
+        <button data-mode="sandbox" role="tab">Scenario</button>
+      </div>
+      <button id="panelBtn">Hide panel</button>
+    </div>
+    <div id="fakeBanner" class="banner fake hidden">PLACEHOLDER DATA - NOT REAL RESULTS</div>
+    <div id="title"></div>
+    <div id="panelBody"></div>
+    <div id="panelFoot">
+      <div id="scenarioLabel" class="hidden">Scenario - illustration, not a validated prediction.</div>
+      <div>Illustrative scene - not a map of fields. The data has no field-level detail.</div>
+    </div>
+  </aside>
 </div>
 
 <script id="data" type="application/json">__DATA_JSON__</script>
@@ -195,8 +240,9 @@ const DATA = Object.assign(JSON.parse($('data').textContent), JSON.parse($('sett
 // levelName() is the one place that turns that number into a label.
 const LEVEL_NAMES = ['None', 'D0', 'D1', 'D2', 'D3', 'D4'];
 const LEVEL_WORDS = ['no drought', 'abnormally dry', 'moderate', 'severe', 'extreme', 'exceptional'];
-const LEVEL_COLORS = ['#8fbf8f', '#ffff00', '#fcd37f', '#ffaa00', '#e60000', '#730000'];
-const NO_DATA_COLOR = '#8a8a8a';
+// Drought ramp (data only). "None" is not in the D0-D4 ramp, so it gets a muted sage.
+const LEVEL_COLORS = ['#5E7F6B', '#E8D26B', '#E3B04B', '#D9843A', '#C2553A', '#8C2F2F'];
+const NO_DATA_COLOR = '#2A333C';
 const levelName = (sev) => (sev == null ? 'No data' : LEVEL_NAMES[sev]);
 const levelText = (sev) => (sev == null ? 'No data' : `${LEVEL_NAMES[sev]} (${LEVEL_WORDS[sev]})`);
 
@@ -354,12 +400,12 @@ function makeLabel(text, worldWidth = 4) {
     sprite.userData.text = t;
     g.clearRect(0, 0, canvas.width, canvas.height);
     let fontSize = 40;
-    do { g.font = `600 ${fontSize}px system-ui, sans-serif`; fontSize -= 2; }
+    do { g.font = `600 ${fontSize}px "DM Sans", system-ui, sans-serif`; fontSize -= 2; }
     while (g.measureText(t).width > canvas.width - 48 && fontSize > 18);
     const w = g.measureText(t).width + 40;
-    g.fillStyle = 'rgba(12, 16, 22, 0.8)';
+    g.fillStyle = 'rgba(14, 19, 24, 0.84)';
     g.beginPath(); g.roundRect((canvas.width - w) / 2, 10, w, 92, 18); g.fill();
-    g.fillStyle = '#f2f4f7'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#E8E4DA'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(t, canvas.width / 2, 57);
     tex.needsUpdate = true;
   };
@@ -382,9 +428,9 @@ const TUBE_H = 1.7;                // the water column spans the top 100 cm of s
 const PLANT_GRID = { rows: 20, perRow: 50 }; // fixed count, tuned to hold 60 fps with shadows on a laptop
 
 // One fixed lighting setup. Drought only tints it, so data colors stay readable.
-const LIGHT = { sky: '#9fc9ec', sun: '#fff3df', sunI: 2.6, sunPos: [14, 24, 12], hemiSky: '#cfe3f7',
+const LIGHT = { sky: '#8FB0C9', sun: '#FFF0DA', sunI: 2.6, sunPos: [14, 24, 12], hemiSky: '#C9DCEB',
   hemiGround: '#6b5a45', hemiI: 1.1, fog: 0.004 };
-const DUST_SKY = new THREE.Color('#c99a62');
+const DUST_SKY = new THREE.Color('#C98A55');
 const DUST_SUN = new THREE.Color('#ffc48a');
 const SOIL_WET = new THREE.Color('#5b4030');
 const SOIL_DRY = new THREE.Color('#7d5d3f');
@@ -662,7 +708,7 @@ async function createWorld(progress) {
 
 function createStateMap() {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#1a2029');
+  scene.background = new THREE.Color('#11171D');
   scene.add(new THREE.HemisphereLight('#dfe8f2', '#3a3a3a', 1.3));
   const sun = new THREE.DirectionalLight('#fff4e2', 2.2);
   sun.position.set(-40, 90, 60);
@@ -689,7 +735,7 @@ function createStateMap() {
     }
   }
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 400), new THREE.MeshStandardMaterial({ color: '#232a34', roughness: 1 }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(600, 400), new THREE.MeshStandardMaterial({ color: '#0E1318', roughness: 1 }));
   ground.rotation.x = -Math.PI / 2;
   ground.position.y = -0.02;
   scene.add(ground);
@@ -702,9 +748,9 @@ function createStateMap() {
     geo.rotateX(-Math.PI / 2); // extrusion now points up (+y), north is -z
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: NO_DATA_COLOR, roughness: 0.7 }));
     mesh.scale.y = 0.04;
-    mesh.userData = { fips: c.fips, targetH: 0.04, targetColor: new THREE.Color(NO_DATA_COLOR) };
+    mesh.userData = { fips: c.fips, state: c.state, targetH: 0.04, targetColor: new THREE.Color(NO_DATA_COLOR) };
     mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30),
-      new THREE.LineBasicMaterial({ color: '#10151b', transparent: true, opacity: 0.55 })));
+      new THREE.LineBasicMaterial({ color: '#0E1318', transparent: true, opacity: 0.7 })));
     scene.add(mesh);
     meshes.push(mesh);
     const ring = c.rings[0].slice(0, -1).map(project);
@@ -714,12 +760,13 @@ function createStateMap() {
 
   // A floating pin over the county shown in the diorama.
   const pin = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.4, 16),
-    new THREE.MeshStandardMaterial({ color: '#f0b429', emissive: '#f0b429', emissiveIntensity: 0.5 }));
+    new THREE.MeshStandardMaterial({ color: '#F2A33A', emissive: '#F2A33A', emissiveIntensity: 0.5 }));
   pin.rotation.x = Math.PI;
   scene.add(pin);
 
   let values = new Map();
-  // Height = estimated dollar loss for the selected year and crop, scaled to the counties in scope;
+  // Only the chosen state is drawn (the other states are hidden, not just faded).
+  // Height = estimated dollar loss for the selected year and crop, scaled to that state's counties;
   // color = that year's max drought level for the crop's season. Grey and flat = no data.
   function setYear(year, crop, price, scope) {
     const i = yearIndex(year);
@@ -730,10 +777,11 @@ function createStateMap() {
       const dollars = Y.lossBu[i] == null || Y.acres[i] == null ? null : Y.lossBu[i] * Y.acres[i] * price;
       return [c.fips, { dollars, sev: Y.sev[i] }];
     }));
-    const inScope = DATA.counties.filter((c) => scope === 'ALL' || c.state === scope);
+    const inScope = DATA.counties.filter((c) => c.state === scope);
     const max = Math.max(1, ...inScope.map((c) => values.get(c.fips).dollars ?? 0));
     for (const mesh of meshes) {
       const v = values.get(mesh.userData.fips);
+      mesh.visible = mesh.userData.state === scope;
       mesh.userData.targetH = v.dollars == null ? 0.04 : 0.2 + 6 * Math.min(1, v.dollars / max);
       mesh.userData.targetColor.set(v.dollars == null ? NO_DATA_COLOR : LEVEL_COLORS[v.sev ?? 0]);
     }
@@ -747,6 +795,7 @@ function createStateMap() {
     }
     const c = centers.get(focusFips);
     const focusMesh = meshes.find((m) => m.userData.fips === focusFips);
+    pin.visible = Boolean(focusMesh?.visible);
     if (c && focusMesh) pin.position.set(c.x, focusMesh.scale.y + 1.6 + Math.sin(time * 2) * 0.25, c.z);
   }
 
@@ -762,7 +811,7 @@ const VIEWS = {
   soil:   { pos: [3.5, 0.2, 24], target: [4.5, -1.2, 0] },
 };
 
-// State view framing: back the camera off until the chosen state (or all four) fits the canvas.
+// State view framing: back the camera off until the chosen state fits the canvas.
 function stateOverview(scope = app.mapScope) {
   const box = stateMap.boxes[scope] ?? stateMap.boxes.ALL;
   const size = box.getSize(new THREE.Vector2()), center = box.getCenter(new THREE.Vector2());
@@ -808,7 +857,7 @@ const app = {
   year: DATA.startYear,
   crop: DATA.startCrop,
   prices: { ...DATA.defaultPrice },      // assumed $/bushel per crop, editable in the panel
-  mapScope: byFips.get(DATA.focusFips).state,  // 'ALL' or a state code
+  mapScope: byFips.get(DATA.focusFips).state,  // the state shown in State view
   playing: false,
   hoverFips: null,
 };
@@ -857,18 +906,18 @@ function renderHistory() {
   $('yearSlider').value = app.year;
   $('yearLabel').textContent = app.year;
   $('title').textContent = app.view === 'state'
-    ? `${app.mapScope === 'ALL' ? 'All four states' : stateName(app.mapScope)} - ${crop} - ${app.year}`
+    ? `${stateName(app.mapScope)} - ${crop} - ${app.year}`
     : `${c.name}, ${stateName(c.state)} - ${crop} - ${app.year}`;
 
   const dollars = !Y || Y.lossBu[i] == null || Y.acres[i] == null ? null : Y.lossBu[i] * Y.acres[i] * price;
   const missing = DATA.counties.filter((k) => !k.inMaster).length;
   const cropOptions = Object.keys(DATA.cropNames).map((k) =>
     `<option value="${k}" ${k === app.crop ? 'selected' : ''}>${cropName(k)}${c.crops[k] ? '' : ' (no records here)'}</option>`).join('');
-  const scopeButtons = ['ALL', ...STATE_CODES].map((code) =>
-    `<button data-scope="${code}" class="${code === app.mapScope ? 'on' : ''}">${code === 'ALL' ? 'All' : stateName(code)}</button>`).join(' ');
+  const scopeButtons = STATE_CODES.map((code) =>
+    `<button data-scope="${code}" class="${code === app.mapScope ? 'on' : ''}">${stateName(code)}</button>`).join(' ');
   const legend = app.view !== 'state' ? '' : `
     <h3>State view - ${app.year}</h3>
-    <div class="small" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">${scopeButtons}</div>
+    <div id="scopeRow">${scopeButtons}</div>
     <div class="small">Height: estimated ${crop} loss in dollars for ${app.year} (not program payout), scaled to the
       counties shown. Color: that year's max drought level. Hover a county for its numbers; click to open its diorama.</div>
     <div class="small" style="margin-top:6px">${LEVEL_NAMES.map((n, k) =>
@@ -876,15 +925,15 @@ function renderHistory() {
     <div class="small" style="margin-top:4px"><span class="sw" style="background:${NO_DATA_COLOR}"></span>Flat grey: no data
       (no reported ${crop} yield that year, or one of the ${missing} counties not in the master dataset).</div>`;
 
-  $('panel').innerHTML = `
+  $('panelBody').innerHTML = `
     ${legend}
     <div class="field"><label for="cropSelect">Crop</label><select id="cropSelect">${cropOptions}</select></div>
-    <h3>Details - ${c.name}, ${stateName(c.state)}, ${app.year}</h3>
+    <h3>Details</h3>
     ${!Y ? `<div class="warn small">No ${crop} records for this county. Pick another crop or county.</div>` : `
     <table class="kv">
       <tr><td>Yield (bu/acre)</td><td>${fmt(Y.yield[i])}</td></tr>
       <tr><td>County trend (bu/acre)</td><td>${fmt(Y.trend[i])}</td></tr>
-      <tr><td>yield_anomaly_pct</td><td>${pct(Y.anomaly[i])}</td></tr>
+      <tr><td>Against county trend</td><td>${pct(Y.anomaly[i])}</td></tr>
       <tr><td>Max drought level</td><td>${levelText(Y.sev[i])}</td></tr>
       <tr><td>Weeks in D2+</td><td>${Y.weeks[i] == null ? 'No data' : Y.weeks[i]}</td></tr>
       <tr><td>Soil water storage</td><td>${c.aws == null ? 'No data' : c.aws + ' mm'}</td></tr>
@@ -914,6 +963,7 @@ function renderHistory() {
     flyTo(stateOverview(app.mapScope));
   }));
   if (Y) drawChart(c, i);
+  renderYearBars();
 }
 
 function drawChart(c, sel) {
@@ -927,27 +977,27 @@ function drawChart(c, sel) {
   if (!Y) return;
   const ys = Y.yield, tr = Y.trend;
   const vals = [...ys, ...tr].filter((v) => v != null);
-  g.font = '10px system-ui, sans-serif';
-  if (!vals.length) { g.fillStyle = '#a3adb8'; g.fillText('No reported yields', 8, 20); return; }
+  g.font = '10px "JetBrains Mono", ui-monospace, monospace';
+  if (!vals.length) { g.fillStyle = '#8E9AA5'; g.fillText('No reported yields', 8, 20); return; }
   const lo = Math.min(...vals) * 0.95, hi = Math.max(...vals) * 1.03;
   const L = 30, R = 6, T = 8, B = 16;
   const X = (k) => L + (W - L - R) * k / (ys.length - 1);
   const Yp = (v) => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
-  g.fillStyle = '#a3adb8';
+  g.fillStyle = '#8E9AA5';
   g.fillText(Math.round(hi), 2, T + 8); g.fillText(Math.round(lo), 2, H - B);
   g.fillText(FIRST, L, H - 3);
   g.textAlign = 'right'; g.fillText(LAST, W - R, H - 3); g.textAlign = 'left';
-  g.strokeStyle = 'rgba(240,180,41,0.85)'; g.lineWidth = 1.5;
+  g.strokeStyle = 'rgba(242,163,58,0.85)'; g.lineWidth = 1.5;
   g.beginPath(); g.moveTo(X(sel), T); g.lineTo(X(sel), H - B); g.stroke();
   const line = (arr) => { let pen = false; g.beginPath();
     arr.forEach((v, k) => { if (v == null) { pen = false; return; }
       if (!pen) { g.moveTo(X(k), Yp(v)); pen = true; } else g.lineTo(X(k), Yp(v)); });
     g.stroke(); };
-  g.setLineDash([4, 3]); g.strokeStyle = '#8fb8e8'; g.lineWidth = 1.2; line(tr); g.setLineDash([]);
-  g.strokeStyle = '#e8ecf1'; g.lineWidth = 1.5; line(ys);
-  g.fillStyle = '#e8ecf1';
+  g.setLineDash([4, 3]); g.strokeStyle = '#8E9AA5'; g.lineWidth = 1.2; line(tr); g.setLineDash([]);
+  g.strokeStyle = '#E8E4DA'; g.lineWidth = 1.5; line(ys);
+  g.fillStyle = '#E8E4DA';
   ys.forEach((v, k) => { if (v != null) { g.beginPath(); g.arc(X(k), Yp(v), 1.8, 0, 7); g.fill(); } });
-  if (ys[sel] != null) { g.fillStyle = '#f0b429'; g.beginPath(); g.arc(X(sel), Yp(ys[sel]), 4, 0, 7); g.fill(); }
+  if (ys[sel] != null) { g.fillStyle = '#F2A33A'; g.beginPath(); g.arc(X(sel), Yp(ys[sel]), 4, 0, 7); g.fill(); }
 }
 
 function setYear(year) {
@@ -959,7 +1009,7 @@ function enterState() {
   if (app.mode !== 'history') return;
   if (app.view === 'state') { flyTo(stateOverview()); return; }
   const c = stateMap.centers.get(app.fips);
-  if (app.mapScope !== 'ALL') app.mapScope = byFips.get(app.fips).state;
+  app.mapScope = byFips.get(app.fips).state;
   fade(() => {
     app.view = 'state';
     placeCamera({ pos: [c.x, 6, c.z + 4.5], target: [c.x, 0, c.z] });
@@ -1132,7 +1182,7 @@ function buildSandboxPanel() {
     const list = DATA.counties.filter((c) => c.inMaster && c.state === code).sort((a, b) => a.name.localeCompare(b.name));
     return `<optgroup label="${stateName(code)}">${list.map((c) => `<option value="${c.fips}">${c.name}</option>`).join('')}</optgroup>`;
   }).join('');
-  $('panel').innerHTML = `
+  $('panelBody').innerHTML = `
     <h3>Scenario inputs</h3>
     <div class="field"><label for="sbCounty">County</label><select id="sbCounty">${countyOptions}</select></div>
     <div class="field"><label for="sbCrop">Crop</label><select id="sbCrop"></select></div>
@@ -1194,7 +1244,15 @@ function toast(text) {
 // Camera buttons that are visible in this mode, in order (keys 1-3 follow this list).
 const visibleCams = () => [...document.querySelectorAll('[data-cam]')].filter((b) => !b.classList.contains('hidden'));
 
+// The last view the user picked (State, Aerial or Soil Cutaway) is kept for this browser tab, so it
+// survives switching county, crop or mode, and the reloads Streamlit does when page inputs change.
+// A first visit starts at State.
+const VIEW_KEY = 'droughtViewerView';
+let lastView = ['state', 'aerial', 'soil'].includes(store.get(VIEW_KEY)) ? store.get(VIEW_KEY) : 'state';
+function rememberView(name) { lastView = name; store.set(VIEW_KEY, name); }
+
 function goView(name) {
+  rememberView(name);
   if (name === 'state') { enterState(); return; }
   if (app.view === 'state') { enterCounty(app.fips, name); return; }
   flyTo(VIEWS[name]);
@@ -1208,27 +1266,77 @@ function updateViewUI() {
 
 function setPanelHidden(hidden) {
   document.body.classList.toggle('panel-hidden', hidden);
-  $('panelBtn').textContent = hidden ? 'Show panel' : 'Hide panel';
   store.set('droughtViewerPanelHidden', hidden ? '1' : '0');
   resizeRenderer();
   if (!hidden && app.mode === 'history' && byFips.get(app.fips).crops[app.crop]) drawChart(byFips.get(app.fips), yearIndex(app.year));
 }
 
-function setupUI() {
-  const isHistory = app.mode === 'history';
-  $('fakeBanner').classList.toggle('hidden', !DATA.placeholder);
-  $('timeline').classList.toggle('hidden', !isHistory);
-  $('scenarioLabel').classList.toggle('hidden', isHistory);
-  document.querySelector('[data-cam="state"]').classList.toggle('hidden', !isHistory);
+// --- year card: one bar per year, colored by that county-year's max drought level --------------
+function renderYearBars() {
+  const c = byFips.get(app.fips), Y = c.crops[app.crop];
+  $('yearBars').innerHTML = YEARS.map((year, i) => {
+    const hasYield = Y && Y.yield[i] != null;
+    const sev = Y ? Y.sev[i] : null;
+    const label = hasYield ? `${year}: ${levelText(sev)}` : `${year}: no reported yield`;
+    const style = hasYield ? `background:${LEVEL_COLORS[sev ?? 0]}` : '';
+    return `<div class="yb${hasYield ? '' : ' nodata'}${year === app.year ? ' sel' : ''}" data-year="${year}" title="${label}" style="${style}"></div>`;
+  }).join('');
+}
+const YEARS = Array.from({ length: LAST - FIRST + 1 }, (_, k) => FIRST + k);
 
-  document.querySelectorAll('[data-cam]').forEach((b) => b.addEventListener('click', () => goView(b.dataset.cam)));
-  $('panelBtn').addEventListener('click', () => setPanelHidden(!document.body.classList.contains('panel-hidden')));
-  setPanelHidden(store.get('droughtViewerPanelHidden') === '1');
-
-  $('yearSlider').addEventListener('input', (e) => setYear(Number(e.target.value)));
+function setupYearCard() {
+  // Tick labels sit under the centers of their bars (same math as the slider thumb).
+  $('yearTicks').innerHTML = [FIRST, 2010, LAST].map((y) => {
+    const k = y - FIRST;
+    return `<span style="left: calc(var(--bw) / 2 + ${k} * (var(--bw) + var(--gap)))">${y}</span>`;
+  }).join('');
+  $('yearBars').addEventListener('click', (e) => {
+    const bar = e.target.closest('.yb');
+    if (bar) { stopPlay(); setYear(Number(bar.dataset.year)); }
+  });
+  $('yearSlider').addEventListener('input', (e) => { stopPlay(); setYear(Number(e.target.value)); });
   $('playBtn').addEventListener('click', togglePlay);
+}
 
-  // Keyboard: 1-3 = visible camera buttons, space = Play/Pause (Mode 1)
+// --- History | Scenario switch -----------------------------------------------------------------
+function applyMode(mode) {
+  app.mode = mode;
+  const isHistory = mode === 'history';
+  document.body.classList.toggle('mode-sandbox', !isHistory);
+  document.querySelectorAll('[data-mode]').forEach((b) => {
+    b.classList.toggle('on', b.dataset.mode === mode);
+    b.setAttribute('aria-selected', b.dataset.mode === mode);
+  });
+  document.querySelector('[data-cam="state"]').classList.toggle('hidden', !isHistory);
+  $('scenarioLabel').classList.toggle('hidden', isHistory);
+  stopPlay();
+  resizeRenderer();
+  if (isHistory) {
+    app.fips = sb.fips && byFips.get(sb.fips)?.inMaster ? sb.fips : app.fips;
+    renderHistory();
+    if (lastView === 'state' && app.view !== 'state' && app.booted) enterState();   // back to the user's view
+  } else {
+    sb.fips = app.fips;
+    if (app.view === 'state') {   // the scenario lives in the diorama; State view is History only
+      fade(() => { app.view = 'diorama'; placeCamera(lastView === 'soil' ? VIEWS.soil : VIEWS.aerial); updateViewUI(); });
+    }
+    buildSandboxPanel();
+    renderSandbox();
+  }
+}
+
+function setupUI() {
+  $('fakeBanner').classList.toggle('hidden', !DATA.placeholder);
+  document.querySelectorAll('[data-cam]').forEach((b) => b.addEventListener('click', () => goView(b.dataset.cam)));
+  document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.mode !== app.mode) applyMode(b.dataset.mode);
+  }));
+  $('panelBtn').addEventListener('click', () => setPanelHidden(true));
+  $('showPanelBtn').addEventListener('click', () => setPanelHidden(false));
+  setPanelHidden(store.get('droughtViewerPanelHidden') === '1');
+  setupYearCard();
+
+  // Keyboard: 1-3 = visible camera buttons, space = Play/Pause (History). Arrow keys move the slider natively.
   window.addEventListener('keydown', (e) => {
     if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) && e.target.type !== 'range') return;
     const k = Number(e.key);
@@ -1248,7 +1356,7 @@ function setupUI() {
     const rect = canvas.getBoundingClientRect();
     pointer.set((e.clientX - rect.left) / rect.width * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(stateMap.meshes, false)[0];
+    const hit = raycaster.intersectObjects(stateMap.meshes.filter((m) => m.visible), false)[0];
     app.hoverFips = hit ? hit.object.userData.fips : null;
     if (!hit) { tip.classList.add('hidden'); return; }
     const c = byFips.get(app.hoverFips), v = stateMap.value(app.hoverFips);
@@ -1258,7 +1366,7 @@ function setupUI() {
         ? `<b>${c.name}, ${c.state}</b><br>No ${cropName(app.crop).toLowerCase()} records<br><span class="muted">Click to open the diorama</span>`
         : `<b>${c.name}, ${c.state}</b> - ${app.year}<br>Drought: ${levelText(v.sev)}<br>Est. ${cropName(app.crop).toLowerCase()} loss: ${money(v.dollars)}` +
           '<br><span class="muted">Click to open the diorama</span>';
-    tip.style.left = Math.min(e.clientX - rect.left + 14, rect.width - 250) + 'px';
+    tip.style.left = Math.min(e.clientX - rect.left + 14, rect.width - 260) + 'px';
     tip.style.top = (e.clientY - rect.top + 14) + 'px';
     tip.classList.remove('hidden');
   });
@@ -1266,16 +1374,23 @@ function setupUI() {
     const moved = downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5;
     if (app.view === 'state' && !moved && app.hoverFips && !flight) {
       const c = byFips.get(app.hoverFips);
-      if (c.inMaster) enterCounty(app.hoverFips);
+      if (c.inMaster) { rememberView('aerial'); enterCounty(app.hoverFips); }
       else toast(`${c.name} is not in the master dataset: no data.`);
     }
   });
 }
 
+// Play steps through the years in order and pauses at the last year.
 function togglePlay() {
-  app.playing = !app.playing;
-  $('playBtn').textContent = app.playing ? 'Pause' : 'Play';
-  $('playBtn').classList.toggle('on', app.playing);
+  if (app.playing) { stopPlay(); return; }
+  if (app.year >= LAST) setYear(FIRST);
+  app.playing = true;
+  playTimer = 0;
+  $('playBtn').textContent = 'Pause';
+}
+function stopPlay() {
+  app.playing = false;
+  $('playBtn').textContent = 'Play';
 }
 
 // --- render loop -----------------------------------------------------------------
@@ -1288,7 +1403,11 @@ function loop() {
   const time = clock.elapsedTime;
   if (app.playing) {
     playTimer += dt;
-    if (playTimer > 1.3) { playTimer = 0; setYear(app.year >= LAST ? FIRST : app.year + 1); }
+    if (playTimer > 1.3) {
+      playTimer = 0;
+      setYear(app.year + 1);
+      if (app.year >= LAST) stopPlay();
+    }
   }
   updateFlight(dt);
   controls.update();
@@ -1296,7 +1415,7 @@ function loop() {
   else { worldA.update(dt, time); renderer.render(worldA.scene, camera); }
 
   frames++; fpsTimer += dt;
-  if (fpsTimer >= 1) { window.__fps = Math.round(frames / fpsTimer); $('fps').textContent = `- ${window.__fps} fps`; frames = 0; fpsTimer = 0; }
+  if (fpsTimer >= 1) { window.__fps = Math.round(frames / fpsTimer); $('fps').textContent = `· ${window.__fps} fps`; frames = 0; fpsTimer = 0; }
   requestAnimationFrame(loop);
 }
 
@@ -1319,18 +1438,29 @@ async function boot() {
   stateMap = createStateMap();
   await progress('Extruding the state map');
   setupUI();
-  if (app.mode === 'history') renderHistory();
-  else { buildSandboxPanel(); renderSandbox(); }
+  applyMode(app.mode);
   worldA.snap();
   await progress('Ready');
   window.__loadMs = Math.round(performance.now() - t0);
 
-  placeCamera({ pos: [0, 48, 40], target: [0, 0, 0] });
+  // Open on the user's last view (State on a first visit). Scenario mode has no State view.
+  let opening;
+  if (lastView === 'state' && app.mode === 'history') {
+    app.view = 'state';
+    app.mapScope = byFips.get(app.fips).state;
+    updateViewUI();
+    opening = stateOverview();
+    placeCamera({ pos: [opening.target[0], opening.pos[1] * 1.6, opening.target[2] + opening.pos[2] * 0.4], target: opening.target });
+  } else {
+    placeCamera({ pos: [0, 48, 40], target: [0, 0, 0] });
+    opening = lastView === 'soil' ? VIEWS.soil : VIEWS.aerial;
+  }
   $('loading').style.opacity = 0;
   setTimeout(() => $('loading').classList.add('hidden'), 500);
   clock.start();
   requestAnimationFrame(loop);
-  flyTo(VIEWS.aerial, 1.6);
+  flyTo(opening, 1.6);
+  app.booted = true;
 }
 
 boot().catch((err) => {
