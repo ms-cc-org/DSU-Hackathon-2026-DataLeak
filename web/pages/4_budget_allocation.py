@@ -1,13 +1,6 @@
-"""Superseded by the Planner tab (web/pages/3_planner.py, step 2); kept on disk, not registered in app.py."""
+"""Unregistered compatibility page; the active Planner embeds this same state fund UI."""
 
-import streamlit as st
-
-from web.ui import showPending
+from web.allocation_ui import renderStateFundPlanner
 
 
-st.title("Budget allocation")
-st.write(
-    "The officer will be able to compare a statewide funding estimate with a "
-    "chosen fund and inspect county allocations under explicit policy rules."
-)
-showPending("Funding-need and allocation calculations")
+renderStateFundPlanner()

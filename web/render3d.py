@@ -8,8 +8,8 @@ states, county diorama, side panel). This module
 
 Mode 1 ("history") reads the 2000-2025 records directly. Mode 2 ("sandbox") runs a simple lookup in
 the browser over the same records; it is labeled as an illustration, not a validated prediction.
-When Lane 2's scenario function lands in src/engine.py, the sandbox numbers should come from it
-instead (see docs/readme_notes/lane-4.md).
+The separate Lane 2 src/engine.py contract estimates insurance payouts for its
+narrower evaluated crop/state scope; the sandbox retains its crop-value-loss lookup.
 """
 
 import base64
@@ -22,6 +22,7 @@ import pandas as pd
 import streamlit as st
 
 from src.data_loader import load_counties, load_master, load_weekly_drought
+from src.projections import nextCalendarYear, preferredProjectionYear
 from web.ui import CROP_NAMES, DEFAULT_PRICE
 
 
@@ -276,6 +277,8 @@ def viewerHtml(mode: str = "history", focusFips: str = DEFAULT_FIPS, startYear: 
         "firstYear": FIRST_YEAR,
         "lastYear": LAST_YEAR,
         "lastProjectedYear": LAST_PROJECTED_YEAR,
+        "defaultProjectionYear": preferredProjectionYear(LAST_YEAR + 1, LAST_PROJECTED_YEAR),
+        "nextCalendarYear": nextCalendarYear(),
         "startYear": int(min(max(startYear, FIRST_YEAR), LAST_YEAR)),
         "startCrop": crop if crop in CROPS else "CORN",
         "defaultPrice": {**DEFAULT_PRICE, **({crop: float(price)} if price is not None else {})},

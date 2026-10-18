@@ -1,4 +1,4 @@
-"""Streamlit entry point: four tabs in a top bar, and the shared style.
+"""Streamlit entry point: five connected tabs and the shared style.
 
 Run from the repository root:
     python -m streamlit run app.py
@@ -22,6 +22,7 @@ currentPage = st.navigation(
         st.Page("web/pages/1_overview.py", title="Story", default=True),
         st.Page("web/pages/2_county_risk.py", title="Explore 3D", url_path="explore"),
         st.Page("web/pages/3_planner.py", title="Planner", url_path="planner"),
+        st.Page("web/pages/3_scenarios.py", title="Insurance", url_path="insurance"),
         st.Page("web/pages/5_method_and_data.py", title="Evidence", url_path="evidence"),
     ],
     position="top",
@@ -32,9 +33,5 @@ brand = Path(__file__).resolve().parent / "web" / "assets" / "brand.svg"
 if brand.exists():
     st.logo(str(brand), size="large")
 applyStyle()  # shared tokens and motion for every page (style only; takes no space)
-applyStyle()  # shared theme motion for every page (style only; takes no space)
-st.sidebar.caption(
-    "August 15 decision. Scenario X is estimated insurance payouts; Y is deductible exposure; Z is illustrative 95% relief."
-)
 
 currentPage.run()
