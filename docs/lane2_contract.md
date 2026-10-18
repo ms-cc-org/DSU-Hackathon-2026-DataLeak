@@ -66,6 +66,9 @@ For 2016–2025, replay uses `d_test.joblib` and labels its estimates `out-of-sa
 
 ## Reporting boundary
 
-The existing official report evaluates Iowa and Nebraska, corn and soybeans together. `app/model/results/iowa_corn_test_slice.md` compares D, B2a and B2b on Iowa corn only using saved test predictions, with no retraining. The active Insurance page now exposes D predictions and exact inputs; Evidence reads these saved reports. `src/insurance_scenarios.py` adds future historical-footprint ensembles and auditable historical modes without changing this engine contract or D's settings. See [the connected prediction contract](PREDICTION_CONTRACT.md).
+| Additional output key in `scenario()` and `replay()` | Meaning and unit |
+|---|---|
+| `reserve_band_x_usd` | Planning range from D's past statewide X misses: 5th–95th percentile of actual / D over out-of-sample 2006–2015, evaluated after the official test; not a guaranteed interval. Scenario returns `plan_usd`, `low_usd`, `high_usd`, `label`, and `source_years` (`2006-2015`) after `acres_scale × price_scale`; replay returns the same dictionaries keyed by state. Applies only to statewide X. |
 
-The all-state/all-crop fund retains the separate prototype crop-value-loss basis. IA/NE runs attach D's corn/soybean predictions as distinctly labeled context with their own climate assumptions; X/Y/Z do not replace allocation weights. See [the Lane 3 contract](lane3_contract.md). X is not total crop-value loss, and Z is not an actual government payment.
+
+The existing official report evaluates Iowa and Nebraska, corn and soybeans together. `app/model/results/iowa_corn_test_slice.md` compares D, B2a and B2b on Iowa corn only using existing saved test predictions, with no retraining. Any Lane 3 allocation rule must label its source amount and must not relabel X as total crop-value loss or Z as an actual government payment.

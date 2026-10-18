@@ -1,0 +1,4 @@
+fips,county_name,state_alpha,year,y_A,y_A_name,worse_A,change_A,n_outlook_maps,last_outlook_map_date
+31001,Adams County,NE,2013,2,D1,0,0,6,2013-09-24
+31001,Adams County,NE,2014,1,D0,0,0,7,2014-09-30
+31001,Adams County,NE,2015,1,D0,1,1,7,2015-09-29

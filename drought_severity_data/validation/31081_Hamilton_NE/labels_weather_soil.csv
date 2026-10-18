@@ -1,0 +1,4 @@
+fips,county_name,state_alpha,year,y_B,y_B_name,worse_B,change_B,weeks_d2plus_to_cutoff,n_input_maps,last_input_map_date
+31081,Hamilton County,NE,2013,4,D3,0,0,8,20,2013-08-13
+31081,Hamilton County,NE,2014,2,D1,1,1,0,20,2014-08-12
+31081,Hamilton County,NE,2015,2,D1,0,0,0,19,2015-08-11

@@ -1,0 +1,100 @@
+fips,county_name,start_level_apr1,p_worse,predicted_level,closest_years,features_outside_training_range
+19001,Adair County,0,0.9978561213976331,1,"2002, 2003, 2001",precip_90d_ratio
+19003,Adams County,0,0.997104082796151,1,"2002, 2003, 2005",precip_90d_ratio
+19005,Allamakee County,0,0.9902926409683099,1,"2006, 2011, 2003",
+19007,Appanoose County,0,0.9990884468435521,1,"2002, 2005, 2006","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19009,Audubon County,1,0.9955220504641705,2,"2011, 2003, 2002","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19011,Benton County,0,0.9987448506232007,1,"2003, 2011, 2005","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19013,Black Hawk County,0,0.9976211921169487,1,"2003, 2006, 2002","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19015,Boone County,2,0.9606422250615004,3,"2001, 2011, 2000","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19017,Bremer County,0,0.9955797655697437,1,"2006, 2003, 2001","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19019,Buchanan County,0,0.9973137333870604,1,"2005, 2003, 2011","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19021,Buena Vista County,3,0.7528438657055959,4,"2006, 2000, 2004","precip_60d_ratio, precip_90d_ratio"
+19023,Butler County,1,0.9848347879054924,2,"2006, 2003, 2011","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19025,Calhoun County,3,0.8382690458262345,4,"2006, 2011, 2000","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19027,Carroll County,3,0.8677894297762773,4,"2006, 2011, 2000","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19029,Cass County,0,0.998228967933113,1,"2002, 2003, 2001",precip_90d_ratio
+19031,Cedar County,0,0.9983721371235793,1,"2005, 2003, 2011",precip_90d_ratio
+19033,Cerro Gordo County,3,0.7425749975001603,4,"2006, 2003, 2011",precip_90d_ratio
+19035,Cherokee County,3,0.7010797008808228,4,"2000, 2006, 2004",precip_60d_ratio
+19037,Chickasaw County,1,0.9741548508100528,2,"2006, 2003, 2011",precip_90d_ratio
+19039,Clarke County,0,0.9982534603404264,1,"2002, 2006, 2005",precip_90d_ratio
+19041,Clay County,3,0.7501293700824988,4,"2007, 2006, 2000",precip_60d_ratio
+19043,Clayton County,0,0.9979764585944544,1,"2003, 2005, 2006","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19045,Clinton County,0,0.997838579701296,1,"2005, 2003, 2001",precip_90d_ratio
+19047,Crawford County,3,0.7658838098622299,4,"2003, 2000, 2001",
+19049,Dallas County,1,0.9945327851700161,2,"2002, 2001, 2003","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19051,Davis County,0,0.9989835461209596,1,"2002, 2005, 2003","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19053,Decatur County,0,0.9982674314913237,1,"2002, 2005, 2003",precip_90d_ratio
+19055,Delaware County,0,0.9980086622080511,1,"2005, 2003, 2001","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19057,Des Moines County,1,0.9911007157912476,2,"2006, 2005, 2003",precip_90d_ratio
+19059,Dickinson County,3,0.6667938647263061,4,"2007, 2008, 2006",precip_60d_ratio
+19061,Dubuque County,0,0.9979539092035175,1,"2003, 2005, 2001","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19063,Emmet County,3,0.6306554491784567,4,"2009, 2003, 2007",precip_60d_ratio
+19065,Fayette County,0,0.9962076688085421,1,"2003, 2006, 2002","precip_60d_ratio, precip_90d_ratio"
+19067,Floyd County,2,0.9197297787177509,3,"2006, 2003, 2011","precip_60d_ratio, precip_90d_ratio"
+19069,Franklin County,2,0.942997991763069,3,"2006, 2003, 2011",precip_90d_ratio
+19071,Fremont County,0,0.9990231222440836,1,"2002, 2003, 2011",precip_90d_ratio
+19073,Greene County,3,0.9043482677917489,4,"2011, 2001, 2006","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19075,Grundy County,0,0.9975869969008948,1,"2003, 2001, 2011","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19077,Guthrie County,1,0.9937907096808096,2,"2001, 2011, 2003","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19079,Hamilton County,2,0.9646656475614381,3,"2006, 2011, 2003","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19081,Hancock County,3,0.7692735441186779,4,"2003, 2006, 2011","precip_60d_ratio, precip_90d_ratio"
+19083,Hardin County,1,0.9880627339843914,2,"2003, 2006, 2001",precip_90d_ratio
+19085,Harrison County,2,0.970133716499526,3,"2002, 2006, 2003",
+19087,Henry County,0,0.9981025938313663,1,"2002, 2005, 2003",precip_90d_ratio
+19089,Howard County,2,0.8749691907867182,3,"2003, 2006, 2011",
+19091,Humboldt County,3,0.7949905958217451,4,"2006, 2011, 2003","precip_60d_ratio, precip_90d_ratio"
+19093,Ida County,3,0.6851431807629413,4,"2011, 2000, 2006",
+19095,Iowa County,0,0.998797196186326,1,"2005, 2006, 2003","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19097,Jackson County,0,0.997924327516155,1,"2005, 2003, 2001","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19099,Jasper County,0,0.9983192468183523,1,"2006, 2001, 2011","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19101,Jefferson County,0,0.9989168967368264,1,"2002, 2005, 2006",precip_90d_ratio
+19103,Johnson County,0,0.9990036775002075,1,"2005, 2003, 2001","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19105,Jones County,0,0.9981898103078307,1,"2005, 2003, 2001","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19107,Keokuk County,0,0.9990766409587932,1,"2005, 2002, 2003",precip_90d_ratio
+19109,Kossuth County,3,0.684804596992297,4,"2003, 2009, 2007",
+19111,Lee County,1,0.9893993312936042,2,"2005, 2006, 2002",precip_90d_ratio
+19113,Linn County,0,0.9982453368563018,1,"2005, 2003, 2001","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19115,Louisa County,0,0.9980220158830492,1,"2005, 2003, 2002",
+19117,Lucas County,0,0.9990308174966299,1,"2005, 2002, 2003","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19119,Lyon County,3,0.7790287822680593,4,"2007, 2003, 2002","precip_60d, precip_60d_ratio"
+19121,Madison County,0,0.9987121317298666,1,"2002, 2003, 2001","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19123,Mahaska County,0,0.9989121970361584,1,"2002, 2005, 2001","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19125,Marion County,0,0.9990529584109413,1,"2006, 2005, 2003","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19127,Marshall County,0,0.9968701792711421,1,"2011, 2006, 2001",precip_90d_ratio
+19129,Mills County,0,0.9991489222719013,1,"2002, 2005, 2003","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19131,Mitchell County,3,0.6805250246365548,4,"2003, 2006, 2009",precip_90d_ratio
+19133,Monona County,2,0.9624953297035193,3,"2006, 2002, 2000",
+19135,Monroe County,0,0.9989710462938608,1,"2003, 2005, 2006","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19137,Montgomery County,0,0.9979407649317871,1,"2002, 2003, 2005",precip_90d_ratio
+19139,Muscatine County,0,0.9979272993091405,1,"2005, 2003, 2011",precip_90d_ratio
+19141,O'Brien County,3,0.7090778361118367,4,"2007, 2000, 2002",precip_60d_ratio
+19143,Osceola County,3,0.5908874747763452,4,"2007, 2003, 2006",precip_60d_ratio
+19145,Page County,0,0.9981820631509329,1,"2002, 2003, 2006",precip_90d_ratio
+19147,Palo Alto County,3,0.549553441777816,4,"2007, 2009, 2000",
+19149,Plymouth County,3,0.8703152493820321,4,"2003, 2007, 2000","precip_60d, precip_60d_ratio"
+19151,Pocahontas County,3,0.6401280028004164,4,"2006, 2007, 2011",
+19153,Polk County,0,0.9988239377681455,1,"2011, 2002, 2001","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19155,Pottawattamie County,1,0.9930043636171727,2,"2003, 2002, 2001","precip_60d_ratio, precip_90d_ratio"
+19157,Poweshiek County,0,0.9986191235540819,1,"2006, 2003, 2001","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19159,Ringgold County,0,0.9970445172909866,1,"2002, 2003, 2011",precip_90d_ratio
+19161,Sac County,3,0.7389630495423795,4,"2006, 2000, 2003",
+19163,Scott County,0,0.9968233826578434,1,"2005, 2003, 2011",precip_90d_ratio
+19165,Shelby County,2,0.9657928390623713,3,"2003, 2001, 2005",precip_90d_ratio
+19167,Sioux County,3,0.7703343785046421,4,"2007, 2002, 2006","precip_60d, precip_60d_ratio"
+19169,Story County,1,0.9889723814768443,2,"2006, 2001, 2003",precip_90d_ratio
+19171,Tama County,0,0.9984146362911207,1,"2003, 2006, 2011","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19173,Taylor County,0,0.9969304176553936,1,"2002, 2003, 2011",precip_90d_ratio
+19175,Union County,0,0.997662052182853,1,"2002, 2003, 2006",precip_90d_ratio
+19177,Van Buren County,0,0.9983105944459443,1,"2002, 2005, 2006",precip_90d_ratio
+19179,Wapello County,0,0.9990028219506608,1,"2002, 2003, 2006","precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19181,Warren County,0,0.9991281758470109,1,"2006, 2005, 2002","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19183,Washington County,0,0.9987935645247773,1,"2005, 2002, 2003",precip_90d_ratio
+19185,Wayne County,0,0.9989482884486562,1,"2002, 2005, 2003","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19187,Webster County,3,0.8299131661547149,4,"2006, 2007, 2011","precip_60d_ratio, precip_90d_ratio, precip_apr1_to_cutoff_ratio"
+19189,Winnebago County,3,0.7603781791451071,4,"2003, 2007, 2009",precip_90d_ratio
+19191,Winneshiek County,1,0.971628351585766,2,"2006, 2011, 2003",precip_90d_ratio
+19193,Woodbury County,2,0.9365735311735932,3,"2007, 2006, 2000",precip_60d_ratio
+19195,Worth County,3,0.6907833364730452,4,"2003, 2006, 2007",precip_90d_ratio
+19197,Wright County,3,0.7765887631282605,4,"2006, 2003, 2011","precip_60d_ratio, precip_90d_ratio"

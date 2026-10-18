@@ -1,0 +1,14 @@
+fips,county_name,state_alpha,year,y_B,y_B_name,worse_B,change_B,weeks_d2plus_to_cutoff,n_input_maps,last_input_map_date
+31163,Sherman County,NE,2000,3,D2,0,0,19,19,2000-08-08
+31163,Sherman County,NE,2001,1,D0,0,0,0,19,2001-08-07
+31163,Sherman County,NE,2002,5,D4,1,4,9,20,2002-08-13
+31163,Sherman County,NE,2003,5,D4,0,0,8,20,2003-08-12
+31163,Sherman County,NE,2004,2,D1,0,0,0,19,2004-08-10
+31163,Sherman County,NE,2005,3,D2,1,1,1,19,2005-08-09
+31163,Sherman County,NE,2006,4,D3,1,2,10,19,2006-08-08
+31163,Sherman County,NE,2007,0,None,0,0,0,19,2007-08-07
+31163,Sherman County,NE,2008,1,D0,1,1,0,20,2008-08-12
+31163,Sherman County,NE,2009,1,D0,1,1,0,19,2009-08-11
+31163,Sherman County,NE,2010,0,None,0,0,0,19,2010-08-10
+31163,Sherman County,NE,2011,1,D0,0,0,0,19,2011-08-09
+31163,Sherman County,NE,2012,5,D4,1,5,5,19,2012-08-07

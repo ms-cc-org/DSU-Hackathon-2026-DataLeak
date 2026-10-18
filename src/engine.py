@@ -17,6 +17,8 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from src.reserve_band import load_ratio_band, reserve_band_x_usd
+
 repoRoot = Path(__file__).resolve().parents[1]
 modelDir = repoRoot / "app" / "model"
 artifactDir = modelDir / "artifacts"
@@ -194,6 +196,7 @@ def scenario(base_year: int, footprint_year: int, state: str = "IA", crop: str =
                        "method": "C historical neighbors, widened to include D point",
                        "label": rangeResult["label"], "widened": bool(rangeResult["widened"][state])}
     return {"county_table": countyTable, "statewide_totals": totals,
+            "reserve_band_x_usd": reserve_band_x_usd(totals["X_payout_usd"]),
             "historical_scenario_range_x_usd": historicalRange,
             "closest_historical_years": _closestYears(scenarioRows, analogModel),
             "out_of_range_summary": _outOfRangeSummary(countyTable), "model": "full",
@@ -213,5 +216,7 @@ def replay(year: int) -> dict[str, Any]:
     countyTable = predict(rows, model=selectedModel)
     stateTotals = countyTable.groupby("state", as_index=False)[list(moneyColumns)].sum()
     return {"county_table": countyTable, "statewide_totals": stateTotals,
+            "reserve_band_x_usd": {row.state: reserve_band_x_usd(float(row.X_payout_usd))
+                                   for row in stateTotals.itertuples(index=False)},
             "model": selectedModel, "evaluation_label": "out-of-sample" if year >= 2016 else "in-sample",
             "year": year, "out_of_range_summary": _outOfRangeSummary(countyTable)}

@@ -1,0 +1,38 @@
+{
+  "A": {
+    "chosen": "M1",
+    "tied_within_0.02": [
+      "M1"
+    ],
+    "walk_forward_auc": {
+      "M1": 0.649784326214981,
+      "M2": 0.6108359314760804,
+      "M3": 0.5172818398203091
+    },
+    "beats_climatology_auc": true,
+    "beats_persistence_exact_level_walk_forward": false,
+    "validation_auc": {
+      "M1": 0.6942420681551116,
+      "M2": 0.6496578419852077,
+      "M3": 0.6072302481509644
+    }
+  },
+  "B": {
+    "chosen": "M1",
+    "tied_within_0.02": [
+      "M1"
+    ],
+    "walk_forward_auc": {
+      "M1": 0.8599403782894737,
+      "M2": 0.7636148902316934,
+      "M3": 0.7923273920194508
+    },
+    "beats_climatology_auc": true,
+    "beats_persistence_exact_level_walk_forward": true,
+    "validation_auc": {
+      "M1": 0.7754337821227454,
+      "M2": 0.4808049624103136,
+      "M3": 0.690907011977246
+    }
+  }
+}
