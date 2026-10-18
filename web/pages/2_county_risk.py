@@ -1,4 +1,4 @@
-"""Mode 1 - County risk: ranked county cards, history charts, and the 3D year viewer (all four states).
+"""Explore 3D: the 3D viewer inline, then counties ranked by expected annual loss (all four states).
 
 Reads the 2000-2025 records directly (no model): every number is what the data says.
 """
@@ -8,8 +8,8 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from web.render3d import CROPS, DEFAULT_FIPS, STATES, loadCountyHistory, showViewer
-from web.ui import (CROP_NAMES, DROUGHT_COLORS, DROUGHT_LABELS, LOSS_LABEL, droughtLabel, markdownSafe,
-                    money, priceInput, showImage)
+from web.ui import (AMBER, CROP_NAMES, DROUGHT_COLORS, DROUGHT_LABELS, LOSS_LABEL, MUTED, NO_DATA_COLOR,
+                    droughtLabel, eyebrow, markdownSafe, money, priceInput)
 
 
 D2_OR_WORSE = 3  # shifted scale: 3 = D2
@@ -57,15 +57,21 @@ def reasonLine(row) -> str:
             f"{row.vulnerability_pct:.1f}% below trend.")
 
 
+def openInViewer(fips: str) -> None:
+    st.session_state["focusFips"] = fips
+
+
 def countyCard(row) -> None:
-    # The "card" key gives the container a CSS class, which web/ui.py uses for the hover lift.
-    with st.container(border=True, key=f"card_{row.fips}"):
+    # The "cardhover" key gives the container a CSS class, which web/ui.py uses for the card style and hover lift.
+    with st.container(key=f"cardhover_{row.fips}"):
         st.markdown(f"**#{row['rank']} {row.county}**")
         st.metric("Expected loss per year", money(row.expected_loss),
                   help="Exposure x average dollar loss in a D2+ year")
         st.markdown(f"Exposure **{row.exposure:.0%}** · Vulnerability **{row.vulnerability_pct:.1f}%** below trend",
                     help="Exposure: share of years at D2 or worse. Vulnerability: average loss in those years.")
         st.caption(reasonLine(row))
+        st.button("Open in 3D", key=f"open_{row.fips}", on_click=openInViewer, args=(row.fips,),
+                  icon=":material/view_in_ar:", width="stretch")
 
 
 def historyCharts(county: pd.DataFrame, price: float, crop: str) -> None:
@@ -77,22 +83,22 @@ def historyCharts(county: pd.DataFrame, price: float, crop: str) -> None:
         levels = county["max_severity"]
         fig = go.Figure(go.Bar(
             x=county["year"], y=levels,
-            marker_color=[DROUGHT_COLORS[int(v)] if pd.notna(v) else "#a0a0a0" for v in levels],
+            marker_color=[DROUGHT_COLORS[int(v)] if pd.notna(v) else NO_DATA_COLOR for v in levels],
             hovertext=[droughtLabel(v) for v in levels], hoverinfo="x+text",
         ))
-        fig.add_hline(y=D2_OR_WORSE - 0.5, line_dash="dash", annotation_text="D2+")
+        fig.add_hline(y=D2_OR_WORSE - 0.5, line_dash="dash", line_color=MUTED, annotation_text="D2+")
         fig.update_layout(title=f"Worst drought level in the {CROP_NAMES[crop].lower()} season", height=320, margin=dict(t=40, b=30),
                           yaxis=dict(tickvals=list(range(6)), ticktext=DROUGHT_LABELS, range=[0, 5.5]))
         st.plotly_chart(fig, width="stretch")
     with right:
         fig = go.Figure(go.Bar(
-            x=county["year"], y=county["cost"], marker_color="#b5452f",
+            x=county["year"], y=county["cost"], marker_color=AMBER,
             hovertext=[f"{p:.1f}% below trend" if pd.notna(p) else "No data" for p in county["loss_pct"]],
             hoverinfo="x+y+text",
         ))
         for year in noData:  # gaps are labeled, never drawn as zero
             fig.add_annotation(x=year, y=0, text="No data", textangle=-90, yanchor="bottom",
-                               showarrow=False, font=dict(size=10, color="gray"))
+                               showarrow=False, font=dict(size=10, color=MUTED, family="JetBrains Mono"))
         fig.update_layout(title=f"Estimated cost by year ({LOSS_LABEL})", height=320,
                           yaxis_tickprefix="$", margin=dict(t=40, b=30))
         st.plotly_chart(fig, width="stretch")
@@ -102,14 +108,15 @@ def historyCharts(county: pd.DataFrame, price: float, crop: str) -> None:
 # Page
 # ---------------------------------------------------------------------------
 
-st.title("County risk")
-st.write("Which counties lose the most crop value when drought hits? Ranked from the 2000-2025 records.")
-showImage("hero_field.jpg")
+eyebrow("EXPLORE 3D")
+st.title("Every county, every season since 2000.")
+st.caption("Drag the year strip or press Play: the diorama, the drought level and the dollar figure follow. "
+           "Real 2000-2025 records; the scene itself is an illustration.")
 
-stateColumn, cropColumn = st.columns(2)
+stateColumn, cropColumn, priceColumn = st.columns([2, 2, 2])
 state = stateColumn.selectbox("State", list(STATES), index=list(STATES).index("IA"), format_func=STATES.get)
 crop = cropColumn.selectbox("Crop", CROPS, format_func=CROP_NAMES.get)
-price = priceInput(crop)
+price = priceInput(crop, where=priceColumn)
 try:
     summary = countySummary(price, state, crop)
     history = loadCountyHistory(state, crop)
@@ -120,12 +127,20 @@ if summary.empty:
     st.info(f"There are no {CROP_NAMES[crop].lower()} records for {STATES[state]} in the dataset.")
     st.stop()
 
+# The county shown in the viewer: a card's "Open in 3D" choice, else Mahaska County (Iowa), else the top-ranked county.
+order = summary["fips"].tolist()
+focus = st.session_state.get("focusFips")
+if focus not in order:
+    focus = DEFAULT_FIPS if DEFAULT_FIPS in order else order[0]
+showViewer("history", focus, startYear=2012, crop=crop, price=price)
+
+st.subheader("Counties ranked by expected annual loss")
 ranked = summary[summary["expected_loss"].notna()]
-st.subheader(f"Highest expected drought loss - {STATES[state]} {CROP_NAMES[crop].lower()}")
 st.caption(markdownSafe(
-    f"Expected loss = exposure x average dollar loss in a D2+ year, at ${price:.2f}/bu (assumed). "
-    f"Loss is yield below each county's 2000-2025 linear trend (hindsight, uses all years); {LOSS_LABEL}. "
-    f"{len(ranked)} of {len(summary)} counties have enough reported yields in drought years to rank."))
+    f"{STATES[state]} {CROP_NAMES[crop].lower()}. Expected loss = exposure x average dollar loss in a D2+ year, at "
+    f"${price:.2f}/bu (assumed). Loss is yield below each county's 2000-2025 linear trend (hindsight, uses all years); "
+    f"{LOSS_LABEL}. Never ranked by average yield_anomaly_pct. {len(ranked)} of {len(summary)} counties have enough "
+    f"reported yields in drought years to rank."))
 top = ranked.head(6)
 for start in range(0, len(top), 3):
     for column, (_, row) in zip(st.columns(3), top.iloc[start:start + 3].iterrows()):
@@ -144,19 +159,8 @@ with st.expander(f"All {len(summary)} counties, ranked"):
         },
     )
 
-st.subheader("County history")
 names = summary.set_index("fips")["county"]
-order = summary["fips"].tolist()
-fips = st.selectbox("County", order, index=order.index(DEFAULT_FIPS) if DEFAULT_FIPS in order else 0,
-                    format_func=lambda f: f"{names[f]} (#{order.index(f) + 1})")
-row = summary[summary["fips"] == fips].iloc[0]
+st.subheader(f"{names[focus]} by year")
+row = summary[summary["fips"] == focus].iloc[0]
 st.write(reasonLine(row))
-historyCharts(history[history["fips"] == fips], price, crop)
-
-st.subheader("3D view")
-st.caption("Opens the county diorama with a 2000-2025 year slider and a map of all four states (253 counties). "
-           "Illustrative scene - not a map of fields; the data has no field-level detail.")
-if st.button("Visualize", type="primary"):
-    st.session_state["showViewer"] = True
-if st.session_state.get("showViewer"):
-    showViewer("history", fips, startYear=2012, crop=crop, price=price)
+historyCharts(history[history["fips"] == focus], price, crop)
