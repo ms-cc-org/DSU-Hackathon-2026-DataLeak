@@ -12,9 +12,15 @@ assumption (inspired by USDA ERP 2022); it is not a prediction of any program pa
 python organize_usda_data.py --downloads ~/Downloads --repo . --out ./usda_budget_data   # rebuild the data from the RMA files
 python app/model/evaluate.py                  # tune, walk-forward 2006-2012 + validation 2013-2015 -> results/validation_report.md
 python app/model/final_test.py --i-am-sure    # ONCE, only when told to: reads the held-out 2016-2025 data -> results/test_report.md
+
+# Lane 2 deployment after the official test output exists:
+python app/model/build_artifacts.py            # fit D and C once; save artifacts/ and verify statewide X
+python app/model/iowa_corn_slice.py            # report Iowa corn only from saved test predictions
 ```
 `final_test.py` refuses to run without `--i-am-sure`; `data.load_split("testing")` raises otherwise. Run it as a script (`python -m app.model...` does not work: `app/` is not a package
 and the root `data/` folder would shadow `data.py`). Data folder: `$USDA_DATA_DIR`, else `<repo>/usda_budget_data`, else `<repo>/app/usda_budget_data`. `usda_budget_data/testing/` is gitignored.
+
+The official test has already produced `results/test_predictions.csv` and `results/test_report.md` in this checkout. The ignored testing input folder is absent here. `build_artifacts.py` recreates its August 15 inputs from the checked-in source panels, joins the saved test output for exposure and observed labels, and fails if D's IA 2023 or NE 2022 statewide X differs from the saved official predictions by $1 or more. `results/test_state_years.csv` is generated from those saved predictions as a numeric reference. The app imports only `src.engine`, which loads artifacts once and never fits during a request. See [the contract](../../docs/lane2_contract.md).
 
 ## Models
 

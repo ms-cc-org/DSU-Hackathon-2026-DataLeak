@@ -54,9 +54,9 @@ st.markdown(
 **The decision:** on **August 15**, how to split a fixed relief fund across counties, using what is
 known about the season by that date.
 
-**What the tool shows:** for each county, how often severe drought hits (exposure), how much yield it
-loses when it does (vulnerability), and what that costs in dollars (an estimated crop loss, not a
-program payout).
+**What the tool shows:** retrospective county drought and yield history, plus an Iowa-corn
+historical-footprint scenario. Its headline X is estimated drought insurance payouts, while
+Y is estimated deductible exposure and Z is an illustrative 95% relief amount.
 """
 )
 
@@ -100,9 +100,9 @@ st.markdown(
     """
 1. **County risk** - ranked county cards for any of the four states and crops, each county's drought and
    loss history, and a 3D view with a 2000-2025 year slider and a map of all four states. Real records only.
-2. **Scenarios** - enter a county, crop, year (up to 2030) and drought level to see the expected loss and
-   the closest historical years. An illustration, not a weather forecast.
-3. **Budget allocation** - split a fund across counties under a chosen rule and trigger.
+2. **Scenarios** - combine a base year's insured exposure with another year's August 15 drought
+   and weather footprint for Iowa corn. Compare X, Y, Z and the closest historical years.
+3. **Budget allocation** - allocation rules are still being built by Lane 3.
 4. **Method and data** - how the numbers are made, what is filtered out, and the limits.
 5. **Credits** - data sources, tools, and how AI was used.
 """

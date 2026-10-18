@@ -28,6 +28,6 @@ currentPage = st.navigation(
 
 applyStyle()  # shared theme motion for every page (style only; takes no space)
 st.sidebar.caption(
-    "California · Delaware · Iowa · Nebraska · August 15 decision. Dollar values are an estimated crop loss, not program payout."
+    "August 15 decision. Scenario X is estimated insurance payouts; Y is deductible exposure; Z is illustrative 95% relief."
 )
 currentPage.run()
