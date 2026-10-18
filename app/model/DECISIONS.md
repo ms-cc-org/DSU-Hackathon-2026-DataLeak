@@ -225,3 +225,12 @@ Frozen settings: `results/params.json` (B: max_iter 400, max_depth 3; C: k 25, d
 `results/range_method.json` (C). `final_test.py` has not been run at the time of writing; it is run once after the commit that contains this entry, and nothing is changed after it runs.
 
 ---
+
+## Entry 8: written 2026-10-18 01:06 EDT (system clock): second request to "run the final test once"; it was NOT run again
+
+The user re-sent the pre-test instructions with extra deliverables. Facts: (1) the alpha edge check and the headline freeze were already done (Entries 6-7: alpha was at the lower edge, 0.01; extended one step; chosen alpha became 0.001; headline stayed D, uncalibrated);
+(2) the official test already ran once, on 2026-10-18 around 00:41 EDT, after the commit that contains Entries 6-7, and its report was committed (originally 8ed713b; the same content is now in main). Running `final_test.py` again would be a second look at the held-out years
+and would break the one-shot rule, so it was not run again. The extra deliverables (test_predictions.csv in the requested layout, test_state_years.csv, the per-state-year table with the closest value in bold, the scoreboard, the chart) are built by
+`app/model/make_test_report.py` purely from the saved outputs of that one run (`test_predictions_raw_shares.csv`, `test_budget_range.csv`, `test_metrics.csv`); no model is refit and no setting changes. The script checks that its numbers equal the saved metrics.
+
+---
