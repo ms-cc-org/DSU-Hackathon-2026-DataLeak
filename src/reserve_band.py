@@ -1,4 +1,4 @@
-"""Planning band for statewide X (exploratory, after the official test; app/model/DECISIONS.md Entry 9).
+"""Planning band for statewide X (exploratory, after the official test; app/model/DECISIONS_extra.md Entry 9).
 
 The constants come from app/model/results/ratio_band.json, built by `python app/model/ratio_band.py` from D's
 out-of-sample state-years 2006-2015. The band applies to statewide X only (never Y, Z or a single county) and never changes D.

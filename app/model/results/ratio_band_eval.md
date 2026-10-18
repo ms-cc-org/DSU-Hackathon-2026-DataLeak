@@ -1,6 +1,6 @@
 # Planning band for statewide X on the 2016-2025 state-years (exploratory, after the official test)
 
-**exploratory, after the official test.** The band was proposed after the official test (DECISIONS.md Entry 9) and is a one-time check, not a selection step: D and its test report are unchanged. Band = D's statewide estimate x [0.063, 1.978] (5th and 95th percentile of actual / D over the out-of-sample state-years 2006-2015; `results/ratio_band.json`). 'Existing C range' = the saved widened historical scenario range in `results/test_budget_range.csv`. Coverage uses the unclipped state-year dollars; the 20 test state-years are the same ones as in the official report.
+**exploratory, after the official test.** The band was proposed after the official test (DECISIONS_extra.md Entry 9) and is a one-time check, not a selection step: D and its test report are unchanged. Band = D's statewide estimate x [0.063, 1.978] (5th and 95th percentile of actual / D over the out-of-sample state-years 2006-2015; `results/ratio_band.json`). 'Existing C range' = the saved widened historical scenario range in `results/test_budget_range.csv`. Coverage uses the unclipped state-year dollars; the 20 test state-years are the same ones as in the official report.
 
 ## Coverage and width (exploratory, after the official test)
 

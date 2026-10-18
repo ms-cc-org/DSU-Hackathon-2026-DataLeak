@@ -1,4 +1,4 @@
-"""One-time check of the planning band on the 2016-2025 state-years (exploratory, after the official test; DECISIONS.md Entry 9).
+"""One-time check of the planning band on the 2016-2025 state-years (exploratory, after the official test; DECISIONS_extra.md Entry 9).
 
 Runs AFTER ratio_band.py. Reads results/ratio_band.json (never writes it), the saved test_predictions.csv and
 test_budget_range.csv from the one official run, and writes results/ratio_band_eval.md. No model is fitted.
@@ -24,7 +24,8 @@ def main():
     band = json.loads((RES / "ratio_band.json").read_text())
     q05, q95 = band["q05"], band["q95"]
     t = pd.read_csv(RES / "test_predictions.csv", dtype={"fips": str})
-    sy = t.groupby(["state_alpha", "year"]).agg(actual=("actual_drought_payout_usd", "sum"), D=("pred_usd_D", "sum")).reset_index()
+    t = t.assign(d_usd=t["t1_D"] * t["liability"])
+    sy = t.groupby(["state_alpha", "year"]).agg(actual=("drought_indemnity", "sum"), D=("d_usd", "sum")).reset_index()
     rng = pd.read_csv(RES / "test_budget_range.csv").rename(columns={"state": "state_alpha"})
     sy = sy.merge(rng[["state_alpha", "year", "budget_low", "budget_high"]], on=["state_alpha", "year"], validate="1:1")
     assert len(sy) == 20 and sy["year"].between(2016, 2025).all()
@@ -44,7 +45,7 @@ def main():
     groups = [("All state-years", sy), ("Drought state-years (IA 2023, NE 2022, NE 2023)", sy[sy.klass == "drought"]),
               ("Quiet state-years", sy[sy.klass == "quiet"])]
     L = [f"# Planning band for statewide X on the 2016-2025 state-years ({TAG})", "",
-         f"**{TAG}.** The band was proposed after the official test (DECISIONS.md Entry 9) and is a one-time check, not a selection step: D and its test report are unchanged. "
+         f"**{TAG}.** The band was proposed after the official test (DECISIONS_extra.md Entry 9) and is a one-time check, not a selection step: D and its test report are unchanged. "
          f"Band = D's statewide estimate x [{q05:.3f}, {q95:.3f}] (5th and 95th percentile of actual / D over the out-of-sample state-years 2006-2015; `results/ratio_band.json`). "
          "'Existing C range' = the saved widened historical scenario range in `results/test_budget_range.csv`. "
          "Coverage uses the unclipped state-year dollars; the 20 test state-years are the same ones as in the official report.", "",

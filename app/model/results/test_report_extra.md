@@ -36,5 +36,5 @@ Closer = smaller absolute statewide error in that state-year.
 ## 2d. Chart: actual vs D vs B2a, statewide payout by year
 ![Actual vs D vs B2a, statewide drought payout, Iowa and Nebraska 2016-2025](test_report_extra.png)
 
-*Extended presentation added from the saved outputs of the one official run (no model was re-run; see DECISIONS.md Entry 8). Per-row predictions in dollars, acres and Z: `test_predictions.csv`;
-per state-year errors and D's scenario range: `test_state_years.csv`.*
+*Extended presentation added from the saved outputs of the one official run (no model was re-run; see DECISIONS.md Entry 8). Per-row predicted dollars = `t1_<model>` × liability, acres = `t2_<model>` × insured acres, and Z = `z_<model>` in `test_predictions.csv`;
+per state-year errors and D's scenario range: `test_state_years_extra.csv`.*

@@ -1,4 +1,4 @@
-"""Tests for the statewide-X planning band (exploratory, DECISIONS.md Entry 9).
+"""Tests for the statewide-X planning band (exploratory, DECISIONS_extra.md Entry 9).
 
 Run: python -m unittest tests.test_ratio_band   (pytest also works)
 """

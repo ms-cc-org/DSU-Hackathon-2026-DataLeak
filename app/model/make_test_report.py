@@ -2,12 +2,12 @@
 
     python app/model/make_test_report.py
 
-Reads results/test_predictions_raw_shares.csv, test_budget_range.csv, test_metrics.csv and test_report.md. Writes results/test_predictions.csv (county x crop x year with actual and predicted
-$ / acres / Z per model), results/test_state_years.csv, results/test_actual_vs_predicted.png and adds a per-state-year table, a scoreboard and the chart to results/test_report.md.
+Reads the original t1_*/t2_* results/test_predictions.csv, test_budget_range.csv and test_metrics.csv.
+Writes only results/test_state_years_extra.csv, results/test_report_extra.png and results/test_report_extra.md.
+The frozen official outputs and main's test_state_years.csv are never written.
 It asserts that statewide figures recomputed from the predictions equal the saved test_metrics.csv, so the numbers in the report cannot differ from the official run.
 """
 import pathlib
-import re
 import sys
 
 import numpy as np
@@ -19,22 +19,9 @@ from evaluate import LABEL                                                  # no
 
 ORDER = ["D", "A", "B", "C", "Z0", "B1", "B2a", "B2b", "B3", "B4"]
 SHOWN = ["D", "B2a", "B2b", "B1", "B3"]
-START, END = "<!-- extras:start -->", "<!-- extras:end -->"
+EXTRA_HEADING = ("Added after the official test. Same frozen predictions, presentation only. "
+                 "Nothing here was used to choose or change a model.")
 INK, BLUE, ORANGE, SURFACE, GRID = "#0b0b0b", "#2a78d6", "#eb6834", "#fcfcfb", "#e4e3df"
-
-
-def build_tables(p):
-    out = p[["fips", "county_name", "state_alpha", "crop", "year", "liability", "insured_acres"]].copy()
-    out["actual_drought_payout_usd"] = p.drought_indemnity.fillna(0)
-    for m in ORDER:
-        out[f"pred_usd_{m}"] = p[f"t1_{m}"] * p.liability
-    out["actual_damaged_acres"] = p.drought_loss_acres.fillna(0)
-    for m in ORDER:
-        out[f"pred_acres_{m}"] = p[f"t2_{m}"] * p.insured_acres
-    out["actual_relief_z_usd"] = p.z_actual
-    for m in ORDER:
-        out[f"pred_z_usd_{m}"] = p[f"z_{m}"]
-    return out
 
 
 def state_years(p, rng):
@@ -114,20 +101,19 @@ def chart(sy, path):
 
 
 def main():
-    raw = pd.read_csv(RESULTS / "test_predictions_raw_shares.csv", dtype={"fips": str})
+    raw = pd.read_csv(RESULTS / "test_predictions.csv", dtype={"fips": str})
     rng = pd.read_csv(RESULTS / "test_budget_range.csv")
     metrics = pd.read_csv(RESULTS / "test_metrics.csv")
-    tidy = build_tables(raw)
-    tidy.to_csv(RESULTS / "test_predictions.csv", index=False)
     sy = state_years(raw, rng)
     verify(sy, metrics)
-    sy.to_csv(RESULTS / "test_state_years.csv", index=False)
-    chart(sy, RESULTS / "test_actual_vs_predicted.png")
+    sy.to_csv(RESULTS / "test_state_years_extra.csv", index=False)
+    chart(sy, RESULTS / "test_report_extra.png")
 
     sb = scoreboard(sy)
     cols = list(sb.columns)
     sb_md = "| " + " | ".join(cols) + " |\n|" + "---|" * len(cols) + "\n" + "\n".join("| " + " | ".join(str(v) for v in r) + " |" for r in sb.itertuples(index=False))
-    extras = f"""{START}
+    extras = f"""# {EXTRA_HEADING}
+
 ## 2b. Per state-year table: actual vs D, B2a, B2b, B1, B3 ($M; **bold** = closest to actual of the five shown)
 {per_state_year_md(sy)}
 
@@ -137,20 +123,14 @@ Closer = smaller absolute statewide error in that state-year.
 {sb_md}
 
 ## 2d. Chart: actual vs D vs B2a, statewide payout by year
-![Actual vs D vs B2a, statewide drought payout, Iowa and Nebraska 2016-2025](test_actual_vs_predicted.png)
+![Actual vs D vs B2a, statewide drought payout, Iowa and Nebraska 2016-2025](test_report_extra.png)
 
-*Extended presentation added from the saved outputs of the one official run (no model was re-run; see DECISIONS.md Entry 8). Per-row predictions in dollars, acres and Z: `test_predictions.csv`;
-per state-year errors and D's scenario range: `test_state_years.csv`.*
-{END}
+*Extended presentation added from the saved outputs of the one official run (no model was re-run; see DECISIONS.md Entry 8). Per-row predicted dollars = `t1_<model>` × liability, acres = `t2_<model>` × insured acres, and Z = `z_<model>` in `test_predictions.csv`;
+per state-year errors and D's scenario range: `test_state_years_extra.csv`.*
 """
-    rep = RESULTS / "test_report.md"
-    text = rep.read_text()
-    text = re.sub(re.escape(START) + r".*?" + re.escape(END) + r"\n?", "", text, flags=re.S)
-    marker = "## 3. T2 (damaged acres)"
-    assert marker in text
-    rep.write_text(text.replace(marker, extras + "\n" + marker, 1))
+    (RESULTS / "test_report_extra.md").write_text(extras)
     print(sb_md)
-    print("verified against test_metrics.csv; wrote test_predictions.csv, test_state_years.csv, test_actual_vs_predicted.png, test_report.md")
+    print("verified against test_metrics.csv; wrote only test_state_years_extra.csv, test_report_extra.png, test_report_extra.md")
 
 
 if __name__ == "__main__":

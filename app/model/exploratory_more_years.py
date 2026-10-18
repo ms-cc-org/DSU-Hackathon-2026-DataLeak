@@ -33,7 +33,7 @@ def fit_predict_t1(train, test, names):
 
 def official(all_rows):
     """Saved official predictions for 2016-2025 (A and B4 un-calibrated again with the saved nested k, so every column is uncalibrated); B0 was not part of the official run -> fitted on 2000-2015."""
-    p = pd.read_csv(RESULTS / "test_predictions_raw_shares.csv", dtype={"fips": str})
+    p = pd.read_csv(RESULTS / "test_predictions.csv", dtype={"fips": str})
     k = pd.read_csv(RESULTS / "test_nested_k.csv")
     for m in ("A", "B4"):
         km = k[(k.model == m) & (k.target == "t1")].set_index("year").k

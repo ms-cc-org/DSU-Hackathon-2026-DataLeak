@@ -12,9 +12,6 @@ assumption (inspired by USDA ERP 2022); it is not a prediction of any program pa
 python organize_usda_data.py --downloads ~/Downloads --repo . --out ./usda_budget_data   # rebuild the data from the RMA files
 python app/model/evaluate.py                  # tune, walk-forward 2006-2012 + validation 2013-2015 -> results/validation_report.md
 python app/model/final_test.py --i-am-sure    # ONCE, only when told to: reads the held-out 2016-2025 data -> results/test_report.md
-python app/model/ratio_band.py                # planning band for statewide X (exploratory, Entry 9) -> results/ratio_band.json
-python app/model/ratio_band_eval.py           # one-time check of that band on 2016-2025 (reads the json) -> results/ratio_band_eval.md
-python -m unittest tests.test_engine          # band tests
 
 # Lane 2 deployment after the official test output exists:
 python app/model/build_artifacts.py            # fit D and C once; save artifacts/ and verify statewide X
@@ -64,9 +61,3 @@ Targets: T1 payout share (X), T2 damaged-acre share. Sample weight = liability.
 - `yield_prev5_mean`, `acres_planted_prev3_mean` and the first two years' rain normals are missing in 2000-2002, so their missing flags can act as weak year proxies.
 - Hyper-parameters are tuned on the same walk-forward folds that are reported (slightly optimistic).
 - Ranges are rough: A, B, D ranges exist only from 2009 and cover poorly; C's range is wide.
-
-## Planning band for statewide X (exploratory, after the official test)
-
-`reserve_band_x_usd` = D's statewide X x [q05, q95], the 5th and 95th percentile of actual / D over the out-of-sample state-years 2006-2015 (`results/ratio_band.json`, built by `ratio_band.py` from `results/oos_predictions.csv` only).
-It applies to statewide X only (not Y, Z or single counties), is reported as exploratory, and never changes D. `ratio_band_eval.py` checks it once on 2016-2025. For real future use, re-run `ratio_band.py` each year after the
-final RMA claims are in, using only out-of-sample years before the forecast year (and log the change in DECISIONS.md first). `src/engine.py` has `load_ratio_band()` and `reserve_band_x_usd(plan_usd)`; call the latter after acres_scale x price_scale.

@@ -1,11 +1,11 @@
-"""Planning band for statewide X (build time). Exploratory, proposed after the official test (DECISIONS.md Entry 9).
+"""Planning band for statewide X (build time). Exploratory, proposed after the official test (DECISIONS_extra.md Entry 9).
 
 Band = D's statewide estimate x [q05, q95], where q05 / q95 are the 5th / 95th percentile of actual / D over the
 out-of-sample state-years 2006-2015 in results/oos_predictions.csv (nothing else is read here: no test file, no testing/ folder).
 It never changes D, and it applies to statewide X only (not Y, Z or single counties).
 
 For real future use, re-run this each year after the final RMA claims are in, using only out-of-sample years before the
-forecast year (edit LAST_YEAR / FIRST_YEAR and the expected state-year count together, and log the change in DECISIONS.md).
+forecast year (edit LAST_YEAR / FIRST_YEAR and the expected state-year count together, and log the change in DECISIONS_extra.md).
 
     python app/model/ratio_band.py
 """

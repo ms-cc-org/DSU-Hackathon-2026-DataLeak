@@ -20,5 +20,3 @@ suggestions.md
 # model data: testing/ is the held-out set and must never be committed
 usda_budget_data/testing/
 app/usda_budget_data/
-# drought-severity model data: the testing/ folder (2016-2025) is only built for the final test
-drought_severity_data/testing/
