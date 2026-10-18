@@ -1,0 +1,11 @@
+{
+  "method": "C",
+  "label": "rough 80% range (10th-90th percentile)",
+  "pooled_coverage": {
+    "A": 0.5,
+    "B": 0.35,
+    "C": 0.8
+  },
+  "target": 0.8,
+  "note": "no method is tuned to hit 80%; the closest on walk-forward + validation is used and labelled rough"
+}

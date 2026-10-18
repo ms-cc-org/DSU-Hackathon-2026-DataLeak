@@ -1,0 +1,10 @@
+{
+  "B": {
+    "max_iter": 200,
+    "max_depth": 4
+  },
+  "C": {
+    "k": 10,
+    "drought_weight": 1.0
+  }
+}

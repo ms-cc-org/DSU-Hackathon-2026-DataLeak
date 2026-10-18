@@ -13,3 +13,6 @@ test.py
 suggestions.md
 .vscode
 .ipynb_checkpoints/
+# model data: testing/ is the held-out set and must never be committed
+usda_budget_data/testing/
+app/usda_budget_data/

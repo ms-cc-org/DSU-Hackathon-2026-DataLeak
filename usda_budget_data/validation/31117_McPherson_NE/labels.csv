@@ -1,0 +1,7 @@
+fips,county_name,state_alpha,crop,year,rma_year_available,insured,liability,insured_acres,avg_coverage,drought_indemnity,heat_indemnity,other_indemnity,drought_loss_acres,drought_payout_share,drought_payout_per_acre,drought_loss_acre_share,full_crop_value,out_of_pocket_drought_loss,est_drought_damage,est_drought_loss_share,relief_gap_to_95pct,yield_per_acre,yield_status,yield_drop_vs_prev5_pct,possible_out_of_pocket_loss
+31117,McPherson County,NE,CORN,2013,True,True,2842620.0,4733.0,0.6958689340988322,155.4,0.0,106063.6,1.785,5.466787681786521e-05,0.03283329811958589,0.00037713923515740545,4084993.395604396,468.5477521981504,623.9477521981504,0.000152741434752267,391.51718795608565,,not_reported,,False
+31117,McPherson County,NE,CORN,2014,True,True,2833320.0,5361.0,0.7145739930299349,1370.0,0.0,157803.0,16.0,0.0004835316872079398,0.2555493378101101,0.0029845178138407013,3965047.7454212457,3377.6616166274816,4747.661616627482,0.0011973781708202586,2785.97383518055,,not_reported,,False
+31117,McPherson County,NE,CORN,2015,True,True,2323438.0,4915.0,0.7219719947560471,0.0,0.0,22548.0,0.0,0.0,0.0,0.0,3218183.0,0.0,0.0,0.0,0.0,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2013,True,True,457888.0,925.0,0.6862663581517234,0.0,83247.0,3012.0,0.0,0.0,0.0,0.0,667216.1538461539,0.0,0.0,0.0,0.0,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2014,True,,,,,,,,,,,,,,,,,,not_reported,,False
+31117,McPherson County,NE,SOYBEANS,2015,True,,,,,,,,,,,,,,,,,,not_reported,,False

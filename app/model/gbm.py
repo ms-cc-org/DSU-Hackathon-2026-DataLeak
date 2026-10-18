@@ -1,0 +1,49 @@
+"""Strategy B: gradient boosting with Poisson loss (copes with many zeros and a long right tail) and
+monotonic constraints so that worse drought can never lower the predicted cost.
+"""
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.inspection import partial_dependence, permutation_importance
+
+from data import FEATURES, norm_weights, y_train
+
+MONOTONE = {+1: ["d2_weeks_50pct", "d3_weeks_50pct", "d2_max_pct", "dsci_mean", "heat35_days"],
+            -1: ["precip_ratio_vs_normal", "irr_share_train_mean", "aws_100cm_mm"]}
+CST = [1 if f in MONOTONE[+1] else -1 if f in MONOTONE[-1] else 0 for f in FEATURES]
+
+
+class GBM:
+    name = "B"
+
+    def __init__(self, max_iter=200, max_depth=3, learning_rate=0.05, min_samples_leaf=30, seed=0):
+        self.params = dict(max_iter=max_iter, max_depth=max_depth, learning_rate=learning_rate,
+                           min_samples_leaf=min_samples_leaf)
+        self.seed = seed
+
+    def fit(self, train, target):
+        self.model_ = HistGradientBoostingRegressor(loss="poisson", monotonic_cst=CST, early_stopping=False,
+                                                    random_state=self.seed, **self.params)
+        self.model_.fit(train[FEATURES], y_train(train, target), sample_weight=norm_weights(train))
+        return self
+
+    def predict(self, df):
+        return np.clip(self.model_.predict(df[FEATURES]), 0, 1)
+
+    score = predict
+
+    def importance(self, df, target, seed=0):
+        """Permutation importance on df (use validation): drop in liability-weighted R^2 when shuffled."""
+        r = permutation_importance(self.model_, df[FEATURES], y_train(df, target), sample_weight=norm_weights(df),
+                                   n_repeats=10, random_state=seed, scoring="r2")
+        return (pd.DataFrame({"feature": FEATURES, "importance": r.importances_mean, "std": r.importances_std})
+                .sort_values("importance", ascending=False).reset_index(drop=True))
+
+    def partial_dependence(self, df, features):
+        rows = []
+        for f in features:
+            pd_ = partial_dependence(self.model_, df[FEATURES].astype(float), [f], grid_resolution=20, kind="average",
+                                     method="brute")
+            rows += [{"feature": f, "value": v, "partial_dependence": p}
+                     for v, p in zip(pd_["grid_values"][0], pd_["average"][0])]
+        return pd.DataFrame(rows)
