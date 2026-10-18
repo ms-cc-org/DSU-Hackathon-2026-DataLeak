@@ -1,4 +1,0 @@
-fips,county_name,state_alpha,crop,year,rma_year_available,insured,liability,insured_acres,avg_coverage,drought_indemnity,heat_indemnity,other_indemnity,drought_loss_acres,drought_payout_share,drought_payout_per_acre,drought_loss_acre_share,full_crop_value,out_of_pocket_drought_loss,est_drought_damage,est_drought_loss_share,relief_gap_to_95pct,yield_per_acre,yield_status,yield_drop_vs_prev5_pct,possible_out_of_pocket_loss
-31005,Arthur County,NE,CORN,2013,True,,,,,,,,,,,,,,,,,,not_reported,,False
-31005,Arthur County,NE,CORN,2014,True,,,,,,,,,,,,,,,,,,not_reported,,False
-31005,Arthur County,NE,CORN,2015,True,,,,,,,,,,,,,,,,,,not_reported,,False

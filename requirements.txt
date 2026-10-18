@@ -22,6 +22,3 @@ python-dotenv==1.2.4     # .env file for NASS API key
 jupyterlab==4.6.4
 ipykernel==7.4.0
 nbformat==5.11.1
-
-#optional: Strategy G (TabPFN v2 weights: Prior Labs License 1.1 = Apache 2.0 + "Built with PriorLabs-TabPFN" attribution; the newer v2.5/v2.6 weights are non-commercial)
-#tabpfn==9.2.0
