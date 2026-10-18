@@ -1,9 +1,9 @@
 """Prototype lookup, not a validated model.
 
-The Planner's scenario numbers: an estimated crop-value loss for a drought level the user picks.
-It uses the same per-level method as the 3D viewer's Scenario mode (lossForBucket in
-web/assets/viewer/viewer.html), so a chosen level gives the same estimate in both. There is no
-drought prediction: the user always chooses the level.
+The Planner's scenario numbers. This is the same method as the 3D viewer's Scenario mode
+(lossForBucket and runEngine in web/assets/viewer/viewer.html), ported to Python so both show the
+same numbers. Lane 3 reuses this lookup for every county and crop in a state;
+the separate src/engine.py contract estimates RMA insurance payouts.
 
 Method, for one county and crop:
   1. History: every 2000-2025 year with a reported yield, its loss % below the county's 2000-2025
@@ -44,19 +44,26 @@ def _countiesByFips() -> dict:
 
 def countyRecords(fips: str, crop: str) -> dict:
     """Year-by-year history for one county and crop, plus its trend line and latest planted acres."""
-    county = _countiesByFips().get(fips)
-    arrays = county["crops"].get(crop) if county else None
-    if not arrays:
+    return recordsForCrop(_countiesByFips().get(fips), crop)
+
+
+def recordsForCrop(countyData: dict | None, crop: str) -> dict:
+    """Extract records from an already-loaded county, avoiding repeated bulk reads."""
+    cropArrays = countyData["crops"].get(crop) if countyData else None
+    if not cropArrays:
         return {"years": [], "trend": None, "acres": None}
-    firstYear = LAST_YEAR - len(arrays["yield"]) + 1
+    firstYear = LAST_YEAR - len(cropArrays["yield"]) + 1
     years = []
-    for i, (lossBu, trend, asof) in enumerate(zip(arrays["lossBu"], arrays["trend"], arrays["asof"])):
-        if lossBu is None or trend is None or asof is None:
+    for yearIndex, (lossBu, trendYield, asOf) in enumerate(zip(cropArrays["lossBu"], cropArrays["trend"], cropArrays["asof"])):
+        if lossBu is None or trendYield is None or trendYield <= 0 or asOf is None:
             continue
-        years.append({"year": firstYear + i, "bucket": bucketOf(asof), "loss": 100 * lossBu / trend})
-    acres = [a for a in arrays["acres"] if a is not None]
-    return {"years": years, "trend": tuple(arrays["trendCoef"]) if arrays["trendCoef"] else None,
-            "acres": acres[-1] if acres else None, "name": county["name"], "state": county["state"]}
+        years.append({"year": firstYear + yearIndex, "bucket": bucketOf(asOf), "loss": 100 * lossBu / trendYield})
+    acreageRecords = [(firstYear + yearIndex, value) for yearIndex, value in enumerate(cropArrays["acres"])
+                      if value is not None]
+    return {"years": years, "trend": tuple(cropArrays["trendCoef"]) if cropArrays["trendCoef"] else None,
+            "acres": acreageRecords[-1][1] if acreageRecords else None,
+            "acreageYear": acreageRecords[-1][0] if acreageRecords else None,
+            "name": countyData["name"], "state": countyData["state"]}
 
 
 def lossForBucket(history: list[dict], bucket: int) -> dict:
@@ -82,17 +89,23 @@ def lossForBucket(history: list[dict], bucket: int) -> dict:
 
 
 def scenario(fips: str, crop: str, year: int, level: str, price: float) -> dict:
-    """Estimated loss % and dollars for one county, crop, year and chosen drought level ("D0".."D4")."""
-    records = countyRecords(fips, crop)
+    """Expected loss % and dollars for one county, crop, year and drought level ("D0".."D4" or "Predict")."""
+    return scenarioFromRecords(countyRecords(fips, crop), year, level, price)
+
+
+def scenarioFromRecords(records: dict, year: int, level: str, price: float) -> dict:
+    """Run the same single-county lookup from records already loaded by either workflow."""
     history = records["years"]
     if len(history) < MIN_HISTORY_YEARS or records["trend"] is None:
         return {"error": "Too few reported yields for this county and crop to run a scenario."}
 
     slope, intercept = records["trend"]
     trendYield = intercept + slope * year
+    if trendYield <= 0:
+        return {"error": "The projected trend yield is not positive for this county and crop."}
     acres = records["acres"]
 
-    def dollars(lossPct):
+    def dollars(lossPct: float) -> float | None:
         return None if acres is None else trendYield * lossPct / 100 * acres * price
 
     bucket = LEVELS.index(level)

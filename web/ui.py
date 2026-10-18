@@ -97,7 +97,7 @@ div:has(> [data-testid="stHeaderLogo"]), a:has(> [data-testid="stHeaderLogo"]), 
 div:has(> [data-testid="stHeaderLogo"])::after, a:has(> [data-testid="stHeaderLogo"])::after,
 button:has(> [data-testid="stHeaderLogo"])::after {{ content: "Drought Relief Planner"; font-family: var(--display);
   font-weight: 700; font-size: 1.05rem; color: var(--text); white-space: nowrap; }}
-[data-testid="stToolbarActions"]::before {{ content: "Iowa · corn · Aug 15 decision"; font-family: var(--mono);
+[data-testid="stToolbarActions"]::before {{ content: "4 states · 4 crops · Aug 15 decision"; font-family: var(--mono);
   font-size: .72rem; letter-spacing: .06em; color: var(--muted); margin-right: 12px; align-self: center; white-space: nowrap; }}
 [data-testid="stTopNavLink"] {{ border-radius: 999px; border: 1px solid var(--line); min-height: 44px; padding: 0 18px;
   display: inline-flex; align-items: center; transition: background .2s ease, color .2s ease; }}

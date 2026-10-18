@@ -1,16 +1,19 @@
 # Architecture overview
 
-This document describes the **current repository layout** after grouping related files. The root `app.py` remains the launch command; the Overview reads supplied data, and the Scenario page calls Lane 2's offline-fitted prediction engine. The allocation page and satellite map still need wiring.
+This document describes the **current repository layout** after grouping related files. The root `app.py` launches five connected tabs. Planner keeps the all-state/all-crop loss lookup and agreed fund rule; Insurance exposes fitted model D with auditable future/historical scenarios, replay and source labels. Supported fund runs attach D context, Evidence reads the saved model reports, and result maps offer USGS imagery or local county outlines.
 
 ## How the pieces connect
 
 ```text
-app.py → web/pages/ → src/data.py → src/data_loader.py → data/
-                    → src/engine.py → app/model/artifacts/ ← app/model/build_artifacts.py
-                                               ↑                    ↑
-                                        app/model/ models   usda_budget_data/ + source panels
-                    → src/allocation.py (Lane 3 boundary)
-                    → web/render3d.py (map boundary)
+app.py → web/pages/ → web/render3d.py → src/data_loader.py → data/
+                    → web/scenario_lookup.py → web/render3d.py
+                    → web/allocation_ui.py → web/allocation_data.py → web/scenario_lookup.py
+                                           → src/allocation.py (pure proportional fund rule)
+Insurance → web/insurance_ui.py → web/insurance_data.py → src/insurance_scenarios.py → src/engine.py
+Planner fund → web/insurance_data.py → model D context joined by FIPS/crop
+src/engine.py → app/model/artifacts/ ← app/model/build_artifacts.py
+Evidence/Story → web/model_evidence.py → app/model/results/
+result maps → web/maps.py → local county geometry + public USGS imagery (optional network)
 ```
 
 `data/processed/` contains supplied source panels, and `data/derived/` is reserved for new feature tables. `usda_budget_data/` contains prepared RMA insurance model rows. `app/model/` owns the current model research, saved artifacts, and official test reports; `web/` owns presentation.
@@ -19,7 +22,7 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 
 | File or folder | Purpose |
 |---|---|
-| `app.py` | Starts the Streamlit app and registers six pages from `web/pages/`. It stays at the root so `python -m streamlit run app.py` remains the launch command. |
+| `app.py` | Starts Streamlit and registers Story, Explore 3D, Planner, Insurance and Evidence. It stays at the root so `python -m streamlit run app.py` remains the launch command. |
 | `README.md` | Gives challenge context, setup and run steps, data credits, and the team's current AI-use disclosure. It links to the project scope and this overview. |
 | `requirements.txt` | Pins Python packages used by the starter data, app, analysis, and notebook. Add a package here when code first depends on it. |
 | `.env.example` | Shows where future provider configuration would be documented without storing a credential. Actual secrets belong in the ignored `.env`. |
@@ -35,17 +38,26 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 |---|---|
 | `web/` | Groups all presentation code and visual assets away from the data and model modules. It is imported by the root entry point and page scripts. |
 | `web/__init__.py` | Marks `web` as a Python package so shared UI helpers have stable imports. |
-| `web/pages/` | Holds the six page scripts registered by `app.py`. Pages are organized in navigation order. |
-| `web/pages/1_overview.py` | Displays project context, counts, and a descriptive chart from reported Iowa corn yields. It does not produce a loss prediction. |
-| `web/pages/2_county_risk.py` | Reserves the historical county-risk view and a future satellite county map. It currently labels the unfinished view. |
-| `web/pages/3_scenarios.py` | Runs Iowa-corn historical-footprint scenarios through `src.engine` and displays statewide X/Y/Z, county estimates, a rough range, and analog years. |
-| `web/pages/4_budget_allocation.py` | Reserves statewide funding and county-allocation comparisons. It currently shows no calculated payment or recommendation. |
-| `web/pages/5_method_and_data.py` | Explains the August 15 data cutoff and model limitations. Its old placeholders need Lane 4 wording updates to display the new RMA test results. |
-| `web/pages/6_credits.py` | Lists the starter data sources and placeholders for later imagery, price, RMA, team, and AI credits. It must be completed as those sources are added. |
-| `web/pages/README.md` | Describes what the six pages currently do and which results remain pending. |
-| `web/ui.py` | Provides the shared `showPending` message used by unfinished pages. It keeps placeholder wording consistent. |
-| `web/render3d.py` | Marks the future satellite-map and illustrative 3D-view boundary. No renderer or imagery tiles are included. |
-| `web/assets/` | Reserves one home for optional decorative media and any locally bundled viewer library. Assets must not supply analytical results. |
+| `web/pages/` | Holds five active tab scripts and two unregistered compatibility/credits pages. |
+| `web/pages/1_overview.py` | Displays the project story, dataset counts, evidence status and an animated state-selectable historical drought map. |
+| `web/pages/2_county_risk.py` | Shows state/crop county rankings, yearly charts and a 3D viewer for historical records across the supplied dataset. |
+| `web/pages/3_planner.py` | Runs the county crop-value-loss scenario for 2026–2030 and embeds the separate state fund workflow. Both use the historical prototype lookup with visible coverage limits. |
+| `web/pages/3_scenarios.py` | Active Insurance entry point at `/insurance`. Delegates to the shared model UI for future ensembles, historical footprint what-ifs and replay. |
+| `web/pages/4_budget_allocation.py` | Unregistered compatibility page that calls the same state fund component embedded in Planner. It contains no separate allocation logic. |
+| `web/pages/5_method_and_data.py` | Active Evidence tab: distinguishes direct predictions from arithmetic and shows the real saved D reports, coverage, separate lookup validation status and credits. |
+| `web/pages/6_credits.py` | Unregistered older credits page; the active Evidence tab calls `web/credits.py`. |
+| `web/pages/README.md` | Describes the five active tabs, cross-page connections and differing analytical coverage. |
+| `web/credits.py` | Renders source, tool and AI-use credits inside the active Evidence tab. |
+| `web/ui.py` | Holds shared theme styling, labels, price assumptions, hero, stats and fallback messages. |
+| `web/render3d.py` | Builds historical county data and embeds the bundled three.js viewer. Its county scene is illustrative; it has no satellite imagery tiles. |
+| `web/scenario_lookup.py` | Computes the historical drought-level lookup and crop-value-loss range for one county/crop. The county Planner and bulk allocation adapter share the same record extraction and calculation. |
+| `web/allocation_data.py` | Builds cached state scenarios across every supplied boundary county and all four crops using the existing lookup. Missing combinations remain explicit with reasons, warnings, acreage years and price assumptions. |
+| `web/allocation_ui.py` | Collects a state fund and all-crop scenario assumptions and renders county totals, crop shares, missing-data explanations and a CSV download. It retains the last calculated snapshot in Streamlit session state. |
+| `web/insurance_ui.py` | Renders model D controls, explicitly labeled predicted shares and calculated X/Y/Z, exact input inspection, model C analog context and provenance downloads. It links to Planner and Evidence. |
+| `web/insurance_data.py` | Caches fitted-model inference for both Insurance and supported state fund context. It never fits a model or creates insurance estimates for unsupported states/crops. |
+| `web/model_evidence.py` | Reads saved official model metrics, actual historical outcomes and reports for the Story, Insurance and Evidence views. Actuals are used only for historical comparisons. |
+| `web/maps.py` | Joins result values to every supplied boundary in a state and renders transparent overlays on USGS imagery. Its local outline alternative needs no tile requests; missing values remain missing. |
+| `web/assets/` | Holds the bundled three.js viewer, local fonts, brand SVG and optional decorative media. Assets must not supply analytical results. |
 | `web/assets/README.md` | Defines the role and evidence boundary for visual assets. |
 | `web/assets/PROMPTS.md` | Will record prompts and provenance if generated visual media is later used. No generated assets are recorded yet. |
 
@@ -53,12 +65,14 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 
 | File or folder | Purpose |
 |---|---|
-| `src/` | Holds data access and app-facing analytical logic, separate from Streamlit pages. Overview uses the Iowa corn history filter, and Scenarios calls the cached Lane 2 engine. |
+| `src/` | Holds source data access, the earlier Iowa-corn filter and the separate Lane 2 RMA engine. Active tabs call `src.data_loader` through the web presentation modules. |
 | `src/data_loader.py` | Loads the supplied master table, source panels, and county GeoJSON from stable repository paths. These are organizer-provided helpers. |
-| `src/data.py` | Filters the master table to Iowa corn while retaining missing-yield records and five-character FIPS. Overview uses this module for real descriptive data. |
+| `src/data.py` | Earlier Iowa-corn filter retained for analysis; active tabs use all-state loaders instead. |
 | `src/features.py` | Reserves construction of drought/weather/soil features known by August 15. No derived feature table has been built. |
 | `src/engine.py` | Loads fitted D/C artifacts once and exposes stable `predict`, `scenario`, and `replay` contracts for insured payout and budget illustrations. |
-| `src/allocation.py` | Reserves funding-need and county-allocation policy rules. It remains empty until the relief policy is defined. |
+| `src/insurance_scenarios.py` | Adapts the unchanged D engine to future historical-footprint ensembles, historical what-ifs and replay with exact input/provenance records. It averages complete runs and calculates spread from statewide totals per run. |
+| `src/allocation.py` | Pure proportional allocation of one state fund across positive county/crop loss estimates. It validates inputs, balances integer cents, preserves unavailable rows and rolls up counties and crops. |
+| `src/projections.py` | Chooses the next calendar year as the default when it is within the supported horizon and labels projected years consistently. The county Planner, state fund form and 3D scenario view share these calendar settings. |
 | `src/build/` | Holds organizer scripts that collected, joined, and checked the supplied dataset. They are reference/pipeline code, not required for the app's current read path. |
 | `src/build/NASS_data_pull.py` | Pulls USDA NASS crop yield and acreage records for the source dataset. |
 | `src/build/ACIS_data_pull.py` | Pulls the daily county weather panel from NOAA ACIS. |
@@ -130,6 +144,13 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 | `app/model/results/` | Holds the existing model evaluation, official-test predictions/reports, the regenerated state-year reference, and the Iowa-corn slice. |
 | `app/model/README.md`, `DECISIONS.md` | Explain model design, data boundaries, evaluation protocol, and the decision history. |
 | `tests/test_engine.py` | Checks artifact reproduction, scenario nonnegativity, out-of-range flags, and dollar scaling using standard-library unittest. |
+| `tests/test_allocation.py` | Checks proportional all-crop shares, county/crop totals, exact cent balancing, zero and missing losses, uncapped funds and rejected inputs. |
+| `tests/test_allocation_data.py` | Checks actual coverage in all four states, agreement with the single-county Planner, price changes, drought fallback flags and missing acreage. |
+| `tests/test_allocation_ui.py` | Uses Streamlit AppTest through the active navigation to test form submissions for all four states, display-only crop filtering and recalculation. |
+| `tests/test_projections.py` | Checks calendar year defaults, 2027 projected yield and dollar conversion, and next-year allocation/CSV output for every state. These check functionality rather than predictive accuracy. |
+| `tests/test_insurance_scenarios.py` | Checks D reproduction, exact climate replacement, scenario scaling, year-only relabeling, replay, model C context and auditable exports. |
+| `tests/test_connected_app.py` | Exercises all five pages, actual model inference in each mode, historical actuals, source labels and fund-to-insurance handoff using Streamlit AppTest. |
+| `tests/test_maps.py` | Checks supplied boundaries, unavailable values, imagery attribution/layer order and the local outline alternative. |
 
 ## Documentation and local planning
 
@@ -139,6 +160,10 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 | `docs/ARCHITECTURE_OVERVIEW.md` | Explains each folder and file in the grouped repository, plus the current/planned data flow. |
 | `docs/PROJECT_SCOPE.md` | Tracks the ultimate goal, confirmed decisions, core moving parts, current state, and open decisions. |
 | `docs/lane2_contract.md` | Specifies the fitted artifacts, prediction function signatures, output units, scenario semantics, and handoff to Lane 3. |
+| `docs/lane3_contract.md` | Defines the confirmed state/all-crop fund policy, scenario data adapter, cent balancing, field meanings and coverage limitations. |
+| `docs/PREDICTION_CONTRACT.md` | Authoritative description of what is predicted, assumed and calculated, including the connected future insurance adapter and input/output provenance. |
+| `docs/VERIFICATION.md` | Records the final automated and browser checks of the connected prediction, allocation, evidence and map flow. |
+| `docs/readme_notes/lane-3.md` | Records the allocation handoff and supersedes older frontend notes that described fund allocation as removed. |
 | `docs/dataset_specification.md` | Gives the organizer's formal master-data fields, filters, units, and validation checks. |
 | `docs/technical_implementation_plan.md` | Explains the organizer's dataset design, source choices, pipeline, and event mechanics. |
 | `docs/Data to Harvest Hackathon at Delaware State University.md` | Preserves the longer event concept, including proposed challenge context. The current student briefing is the stronger source for submission details. |
@@ -152,7 +177,7 @@ app.py → web/pages/ → src/data.py → src/data_loader.py → data/
 | `docs/dev/README.md` | Summarizes the hackathon decision, provided data, project direction, and local documentation. |
 | `docs/dev/scope.md` | Tracks local scope details and completion states. The public `docs/PROJECT_SCOPE.md` is the tracked counterpart. |
 | `docs/dev/project-understanding.md` | Reconciles direct user decisions, planning PDFs, and observed repository state. |
-| `docs/dev/Drought Relief Allocation Planner Project Plan (1).pdf` | Describes the proposed user decision, model, validation, 3D demo, and build schedule. Its claimed prototype is not present in this checkout. |
+| `docs/dev/Drought Relief Allocation Planner Project Plan (1).pdf` | Describes the proposed user decision, model, validation, 3D demo, and build schedule. The current viewer implementation lives under `web/`, not the PDF's proposed `prototype/` path. |
 | `docs/dev/Website Architecture Drought Relief Allocation Planner.pdf` | Describes proposed pages, module boundaries, two modes, viewer, and demo constraints. It is a plan rather than a record of completed code. |
 | `docs/dev/Team To-Do List Conflict-Free Task Lanes.pdf` | Proposes teammate file ownership, handoff shapes, and merge times. Those proposals do not change the actual code layout on their own. |
 
