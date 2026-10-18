@@ -1,6 +1,6 @@
 {
-  "chosen": "A",
-  "reason": "near-best on both metrics (capture within 0.02, WAPE within 5% of best); simplest of ['A', 'B']",
+  "chosen": "B",
+  "reason": "near-best on both metrics (capture within 0.02, WAPE within 5% of best); simplest of ['G']",
   "beats_B1_outside_noise": true,
   "params": {
     "B": {
@@ -10,8 +10,22 @@
     "C": {
       "k": 10,
       "drought_weight": 1.0
+    },
+    "D": {
+      "alpha": 0.01
     }
   },
-  "chosen_before_calibration": "B",
-  "note": "pre-declared rule applied to pooled calibrated metrics; walk-forward part is in-sample for k, see validation_report.md section F"
+  "chosen_before_calibration": "G",
+  "selection_rule_pick": "G",
+  "note": "selection_rule_pick = pre-declared rule on pooled calibrated metrics (walk-forward part in-sample for k; G's pick is not reproducible to the last decimal because TabPFN on Apple MPS is not bit-reproducible); chosen = headline model per DECISIONS.md",
+  "headline": "B",
+  "headline_rule": "G is the headline if CPU prediction for one year takes under 10 s and it installs from requirements.txt; otherwise B (DECISIONS.md, Entry 1, A.4)",
+  "headline_result": "G fails the speed test: CPU prediction of one year (367 IA+NE county-crops, T1+T2) took a median 353 s (T1 163 s, T2 189 s) against the 10 s limit, on 8 cores; it does install cleanly from requirements.txt. So B is the headline model.",
+  "frozen_models": [
+    "G",
+    "B",
+    "D"
+  ],
+  "deployability_file": "app/model/results/g_deployability.json",
+  "headline_decided": "2026-10-17 22:52 EDT"
 }

@@ -60,6 +60,10 @@ def load_split(split, allow_test=False):
     y = y.drop(columns=[c for c in ["county_name", "state_alpha"] if c in y])
     df = x.merge(y, on=KEY, how="left", validate="one_to_one")
     assert df.fips.str.len().eq(5).all(), "fips must stay 5-character text"
+    from erp import erp_trigger                      # B2 only; not in FEATURES
+    flag = erp_trigger(int(df.year.min()), int(df.year.max()))
+    df = df.merge(flag[["fips", "year", "erp_trigger"]], on=["fips", "year"], how="left")
+    df["erp_trigger"] = df.erp_trigger.fillna(0).astype(int)
     df["is_soybeans"] = (df.crop == "SOYBEANS").astype(int)
     df["is_ne"] = (df.state_alpha == "NE").astype(int)
     assert_no_leak(FEATURES)

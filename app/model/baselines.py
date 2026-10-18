@@ -63,3 +63,22 @@ class B1:
         return out
 
     score = predict
+
+
+class B2:
+    """USDA ERP trigger rule (see erp.py): a county that triggers gets the training mean share of triggering rows (liability-weighted, per state x
+    crop), so its predicted cost is proportional to liability; every other county gets 0. Calibrated afterwards like every model."""
+    name = "B2"
+
+    def fit(self, train, target):
+        t = train.assign(_y=y_train(train, target))
+        q = t[t.erp_trigger == 1]
+        self.global_ = _wmean(q._y, q.liability)
+        self.table_ = {k: _wmean(g._y, g.liability) for k, g in q.groupby(["state_alpha", "crop"])}
+        return self
+
+    def predict(self, df):
+        base = np.array([self.table_.get(k, self.global_) for k in zip(df.state_alpha, df.crop)])
+        return base * (df.erp_trigger.to_numpy() == 1)
+
+    score = predict

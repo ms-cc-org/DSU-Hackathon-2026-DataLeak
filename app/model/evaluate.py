@@ -26,24 +26,29 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 
 from analog import Analog
-from baselines import B0, B1
+from baselines import B0, B1, B2
 from budget import RANGE_LABEL, budget_components, residual_pool, total_range
 from data import CARRY, KEY, REPO, RESULTS, T1, T2, add_year_class, load_usable
 from gbm import GBM, GBMDollars
 from hurdle import Hurdle
+from tabpfn_model import AVAILABLE as HAVE_G, TabPFNModel
+from tweedie import Tweedie
 
-MODELS = ["B0", "B1", "A", "B", "C"]
-LABEL = {"B0": "B0 average", "B1": "B1 drought-map rule", "A": "A hurdle", "B": "B boosting",
-         "C": "C look-alikes", "Random": "Random counties", "Oracle": "Oracle (perfect ranking)",
+MODELS = ["B0", "B1", "B2", "A", "B", "C", "D"] + (["G"] if HAVE_G else [])
+LABEL = {"B0": "B0 average", "B1": "B1 drought-map rule", "B2": "B2 USDA ERP trigger rule", "A": "A hurdle", "B": "B boosting",
+         "C": "C look-alikes", "D": "D Tweedie GLM", "G": "G TabPFN v2", "Random": "Random counties", "Oracle": "Oracle (perfect ranking)",
          "BD": "B$ ($ target, uncalibrated)", "BDc": "B$ ($ target, calibrated)"}
-SIMPLEST_FIRST = ["A", "C", "B"]
-RANGED = ["A", "B", "C"]
+# simplest first, fixed before D's results were seen: D (one GLM) < A (two-part GLM) < C (look-alikes) < B (boosted trees)
+SIMPLEST_FIRST = ["D", "A", "C", "B"] + (["G"] if HAVE_G else [])      # G (pretrained black box) last
+RESAMPLED = ["A", "B", "D"] + (["G"] if HAVE_G else [])   # ranges from whole-year residual resampling
+RANGED = ["A", "B", "C", "D"] + (["G"] if HAVE_G else [])  # C's range comes from its neighbours' spread
 WF_YEARS = list(range(2006, 2013))
 TOP_N = 20
 CAPTURE_NOISE, WAPE_NOISE = 0.02, 0.05
-DEFAULT_PARAMS = {"B": {"max_iter": 200, "max_depth": 3}, "C": {"k": 25, "drought_weight": 2.0}}
+DEFAULT_PARAMS = {"B": {"max_iter": 200, "max_depth": 3}, "C": {"k": 25, "drought_weight": 2.0}, "D": {"alpha": 0.1}}
 TUNE_GRID = {"B": {"max_iter": [100, 200, 400], "max_depth": [3, 4]},
-             "C": {"k": [10, 25, 50], "drought_weight": [1.0, 2.0, 3.0]}}
+             "C": {"k": [10, 25, 50], "drought_weight": [1.0, 2.0, 3.0]},
+             "D": {"alpha": [0.01, 0.1, 1.0]}}
 SPEC = {"t1": {"target": T1, "weight": "liability", "actual": "drought_indemnity", "unit": "$",
                "title": "T1 payout share (drought payout / insured $)"},
         "t2": {"target": T2, "weight": "insured_acres", "actual": "drought_loss_acres", "unit": "acres",
@@ -52,8 +57,9 @@ GROUPS = ["all", "drought", "quiet"]
 
 
 def make_model(name, params):
-    return {"B0": B0, "B1": B1, "A": Hurdle,
-            "B": lambda: GBM(**params.get("B", {})), "C": lambda: Analog(**params.get("C", {}))}[name]()
+    return {"B0": B0, "B1": B1, "B2": B2, "A": Hurdle,
+            "B": lambda: GBM(**params.get("B", {})), "C": lambda: Analog(**params.get("C", {})),
+            "D": lambda: Tweedie(**params.get("D", {})), "G": TabPFNModel}[name]()
 
 
 def fit_predict(train, test, params, names=MODELS):
@@ -62,8 +68,10 @@ def fit_predict(train, test, params, names=MODELS):
     out["t1_actual"], out["t2_actual"] = test[T1].to_numpy(), test[T2].to_numpy()
     for n in names:
         m1, m2 = make_model(n, params).fit(train, T1), make_model(n, params).fit(train, T2)
-        out[f"t1_{n}"], out[f"t2_{n}"] = m1.predict(test), m2.predict(test)
-        out[f"score_{n}"], out[f"score2_{n}"] = m1.score(test), m2.score(test)
+        p1, p2 = m1.predict(test), m2.predict(test)
+        out[f"t1_{n}"], out[f"t2_{n}"] = p1, p2
+        out[f"score_{n}"] = p1 if m1.score == m1.predict else m1.score(test)       # A's score is its part-1 probability
+        out[f"score2_{n}"] = p2 if m2.score == m2.predict else m2.score(test)
         if n == "C":
             out["t1_C_lo"], out["t1_C_hi"] = m1.quantiles(test)
             out["t2_C_lo"], out["t2_C_hi"] = m2.quantiles(test)
@@ -164,7 +172,7 @@ def range_rows(pred, pools, t="t1"):
     for y in sorted(pred.year.unique()):
         d = pred[pred.year == y]
         actual = actual_amount(d, t).groupby(d.state_alpha).sum()
-        for m in ["A", "B"]:
+        for m in RESAMPLED:
             for s, (lo, hi) in total_range(d, d[f"{t}_{m}"], pools[m], weight=w, exclude_year=y).items():
                 rows.append({"model": m, "state": s, "year": y, "low": lo, "high": hi, "actual": float(actual[s]),
                              "point": float((d[f"{t}_{m}"] * d[w])[d.state_alpha == s].sum())})
@@ -222,7 +230,7 @@ def tune(train):
 def choose(pooled):
     """Apply the pre-declared choice rule to the pooled walk-forward + validation 'all' metrics (T1)."""
     m = pooled[pooled.group == "all"].set_index("model")
-    cand = ["A", "B", "C"]
+    cand = list(RANGED)
     cap_best, wape_best = m.loc[cand, "capture_top20"].max(), m.loc[cand, "wape"].min()
     near = [c for c in SIMPLEST_FIRST if m.loc[c, "capture_top20"] >= cap_best - CAPTURE_NOISE
             and m.loc[c, "wape"] <= wape_best * (1 + WAPE_NOISE)]
@@ -348,7 +356,8 @@ def drought_facts_ia2013():
 
 def known_misses(pts, liab):
     """State-years where all five models were off by more than 50% (T1 payout $), with a one-line likely reason."""
-    w = pts.pivot_table(index=["state_alpha", "year"], columns="model", values="pred")[MODELS]
+    miss_models = [m for m in MODELS if m != "B2"]
+    w = pts.pivot_table(index=["state_alpha", "year"], columns="model", values="pred")[miss_models]
     act = pts.drop_duplicates(["state_alpha", "year"]).set_index(["state_alpha", "year"]).actual
     rel = w.sub(act, axis=0).div(act, axis=0)
     bad = rel[(rel.abs() > 0.5).all(axis=1)]
@@ -371,7 +380,7 @@ def known_misses(pts, liab):
         else:
             reason = "Models disagree in sign; payout depends on local conditions the Aug-15 inputs only weakly capture."
         rows.append({"state": s, "year": y, "actual $M": act[(s, y)] / 1e6, "direction": direction,
-                     **{LABEL[m] + " $M": w.loc[(s, y), m] / 1e6 for m in MODELS}, "likely reason": reason})
+                     **{LABEL[m] + " $M": w.loc[(s, y), m] / 1e6 for m in miss_models}, "likely reason": reason})
     return pd.DataFrame(rows), facts
 
 
@@ -403,7 +412,7 @@ def fit_calibration(wf):
         act = actual_amount(wf, t).sum()
         for m in MODELS:
             pred = (wf[f"{t}_{m}"] * wf[sp["weight"]]).sum()
-            rows.append({"target": t, "model": m, "k": act / pred, "unit": sp["unit"], "walk_forward_actual": act,
+            rows.append({"target": t, "model": m, "k": act / pred if pred > 0 else 1.0, "unit": sp["unit"], "walk_forward_actual": act,
                          "walk_forward_predicted": pred, "walk_forward_rows": len(wf), "fit_years": "2006-2012"})
     return pd.DataFrame(rows)
 
@@ -537,10 +546,10 @@ def verdict_text(ctx):
                      f"on validation alone WAPE is {va_.wape:.2f} for {ch} vs {vb_.wape:.2f} for {ctx['verdict_before']['chosen']}")
     if abs(ca.calibration - 1) > 0.25:
         flags.append(f"{LABEL[ch]} still {'under' if ca.calibration < 1 else 'over'}-budgets on validation ({ca.calibration:.2f}), mostly Iowa 2013, which no Aug-15 input can show")
-    flags.append(f"{int((~bud.point_inside).sum())} of {len(bud)} state-years needed the {ctx['best_range']} range widened to contain {ch}'s point estimate")
+    flags.append(f"{int((~bud.point_inside).sum())} of {len(bud)} state-years needed the {ctx['best_range']} range widened to contain {ctx['headline']}'s point estimate")
     s.append("What looks off: " + "; ".join(flags) + ".")
     s.append("Ranges stay rough: pooled 80%-range coverage after calibration is " + ", ".join(f"{m} {rc[m] * 100:.0f}%" for m in RANGED)
-             + f" and {ctx['bud_cov_pooled'] * 100:.0f}% for the budget range ({ctx['best_range']}, widened around {ch}'s point).")
+             + f" and {ctx['bud_cov_pooled'] * 100:.0f}% for the budget range ({ctx['best_range']}, widened around {ctx['headline']}'s point).")
     return " ".join(s)
 
 
@@ -562,7 +571,7 @@ def write_report(ctx):
     M, Mb = ctx["metrics"], ctx["metrics_before"]
     sel = lambda t, split, grp: M[(M.target == t) & (M.split == split) & (M.group == grp)]
     cls = ctx["class_of"]
-    ch, cal, bud = ctx["verdict"]["chosen"], ctx["cal"], ctx["bud"]
+    ch, cal, bud = ctx["headline"], ctx["cal"], ctx["bud"]
     drought_sy = {sp: sorted(f"{s} {y}" for (s, y), c in cls.items() if c == "drought" and y in ctx["years"][sp]) for sp in ctx["years"]}
     kt = cal.pivot(index="model", columns="target", values="k").reindex(MODELS)
     kt_tbl = pd.DataFrame({"Model": [LABEL[m] for m in MODELS], "k for T1 (payout $)": kt.t1.round(3).to_numpy(),
@@ -591,7 +600,7 @@ How the 80% ranges are built. A and B: whole past years' residuals (walk-forward
 resampled one year at a time, the same year's residual applied to every county together (droughts hit counties together; never row by row), and the
 10th-90th percentile of the resulting statewide totals is taken (own year left out). C: 10th-90th percentile of the liability-weighted shares of its
 k nearest look-alikes (scaled by C's calibration factor), every county at the same quantile. B0 and B1 have no range. The budget range is the best
-of these ({ctx['best_range']}), widened where needed so the chosen model's ({ch}) calibrated point estimate lies inside it.
+of these ({ctx['best_range']}), widened where needed so the headline model's ({ch}) calibrated point estimate lies inside it.
 
 Tuned on walk-forward only (criterion: pooled county-year dollar WAPE of T1, before calibration): `{json.dumps(ctx['params'])}`.
 
@@ -660,6 +669,8 @@ validation {ctx['bud_cov']['validation']}.
   other than drought, so drought-payout models cannot predict them. Final-test results for 2020 Iowa should be read with that in mind.
 """.format(a2=(ctx["facts"] or {}).get("apr2", float("nan"))))
     out.append("## F. Verdict\n\n" + ctx["verdict_text"] + "\n")
+    if ctx["headline_result"]:
+        out.append(f"**Headline model for the v1 test: {LABEL[ctx['headline']]}.** {ctx['headline_result']} (see `app/model/DECISIONS.md`)\n")
     sc = ctx["side"]
     side_rows = []
     for sp in ["walk-forward", "validation"]:
@@ -725,8 +736,8 @@ def main():
 
     raw_frames = {"walk-forward": wf, "validation": vp, "pooled": oos}
     cal_frames = {"walk-forward": wfc, "validation": vpc, "pooled": oosc}
-    pools_raw = {t: {m: residual_pool(wf, m, t) for m in ["A", "B"]} for t in SPEC}
-    pools_cal = {t: {m: residual_pool(wfc, m, t) for m in ["A", "B"]} for t in SPEC}
+    pools_raw = {t: {m: residual_pool(wf, m, t) for m in RESAMPLED} for t in SPEC}
+    pools_cal = {t: {m: residual_pool(wfc, m, t) for m in RESAMPLED} for t in SPEC}
     Mb, _ = build_metrics(raw_frames, oos, years, pools_raw)
     Ma, cov_cal = build_metrics(cal_frames, oosc, years, pools_cal)
     inv = invariance(Mb, Ma)
@@ -736,10 +747,20 @@ def main():
     pooled_t1 = Ma[(Ma.target == "t1") & (Ma.split == "pooled")]
     verdict = choose(pooled_t1)
     verdict_before = choose(Mb[(Mb.target == "t1") & (Mb.split == "pooled")])
-    verdict.update(params=params, chosen_before_calibration=verdict_before["chosen"],
-                   note="pre-declared rule applied to pooled calibrated metrics; walk-forward part is in-sample for k, see validation_report.md section F")
-    json.dump(verdict, open(RESULTS / "chosen_model.json", "w"), indent=2)
-    ch = verdict["chosen"]
+    # chosen_model.json: "selection_rule_pick" is the plan's rule applied to this run; "chosen" is the HEADLINE model, set by the deployability rule in
+    # DECISIONS.md (kept across runs once recorded). Models G, B, D are frozen for the v1 test whatever the rule picks.
+    f_old = RESULTS / "chosen_model.json"
+    old = json.load(open(f_old)) if f_old.exists() else {}
+    headline = old.get("headline", verdict["chosen"])
+    out = dict(verdict)
+    out.update(params=params, chosen_before_calibration=verdict_before["chosen"], selection_rule_pick=verdict["chosen"], chosen=headline,
+               note="selection_rule_pick = pre-declared rule on pooled calibrated metrics (walk-forward part in-sample for k; G's pick is not reproducible "
+                    "to the last decimal because TabPFN on Apple MPS is not bit-reproducible); chosen = headline model per DECISIONS.md")
+    for k in ("headline", "headline_rule", "headline_result", "frozen_models", "deployability_file", "headline_decided"):
+        if k in old:
+            out[k] = old[k]
+    json.dump(out, open(f_old, "w"), indent=2)
+    ch = headline
 
     rng_pooled = pooled_t1[(pooled_t1.group == "all") & pooled_t1.model.isin(RANGED)][["model", "range_cov", "range_k", "range_n"]]
     best_range = rng_pooled.assign(gap=(rng_pooled.range_cov - 0.8).abs()).sort_values(["gap", "model"]).model.iloc[0]
@@ -793,14 +814,14 @@ def main():
     class_of = add_year_class(oosc).drop_duplicates(["state_alpha", "year"]).set_index(["state_alpha", "year"]).sy_class.to_dict()
     liab = oosc.groupby(["state_alpha", "year"]).liability.sum()
     misses, facts = known_misses(pts_cal["t1"], liab)
-    ctx = dict(metrics=Ma, metrics_before=Mb, params=params, n_train=len(train), n_val=len(val), class_of=class_of, years=years,
+    ctx = dict(headline=headline, headline_result=old.get("headline_result", ""), metrics=Ma, metrics_before=Mb, params=params, n_train=len(train), n_val=len(val), class_of=class_of, years=years,
                pts=pts_cal["t1"], cov_t1=cov_cal["t1"], misses=misses, facts=facts, coefs=coefs, imp=imp, ex=ex, tune=tune_tbl,
                verdict=verdict, verdict_before=verdict_before, cal=cal, invariance=inv, bud=bud, bud_cov=bud_cov,
                bud_cov_pooled=bud_cov_pooled, best_range=best_range, side=side, side_k=side_k,
                rng_cov=rng_pooled.set_index("model").range_cov)
     ctx["verdict_text"] = verdict_text(ctx)
     write_report(ctx)
-    print(json.dumps({k: verdict[k] for k in ("chosen", "chosen_before_calibration", "reason")}, indent=2))
+    print(json.dumps({"headline": headline, "selection_rule_pick": verdict["chosen"], "reason": verdict["reason"]}, indent=2))
     print("range method:", best_range, "| point inside range:", f"{int(bud.point_inside.sum())}/{len(bud)}")
     print("report ->", RESULTS / "validation_report.md")
 

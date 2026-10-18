@@ -8,7 +8,7 @@ This file documents the model code; the repo's main README.md is untouched.
 
 ```bash
 python app/model/evaluate.py                  # tune, walk-forward + validation -> results/validation_report.md (+ validation_results.csv)
-python app/model/final_test.py --i-am-sure    # ONCE, at the very end: reads testing/ -> results/test_report.md
+python app/model/final_test.py --i-am-sure    # ONCE, at the very end: reads testing/ -> results/test_report.md  (run as a script; `python -m app.model...` does not work)
 ```
 `final_test.py` refuses to run without `--i-am-sure`, and `data.load_split("testing")` raises unless that flag path
 is used. `evaluate.py` never touches `testing/`. Data folder: `$USDA_DATA_DIR`, else `<repo>/usda_budget_data`,
@@ -21,7 +21,9 @@ else `<repo>/app/usda_budget_data`.
 | `data.py` | load + join (`fips` always text) + filter + feature list, `Preprocessor` (median impute, missing flags, standardise) |
 | `baselines.py` | B0 (state x crop mean), B1 (state x crop x `d2_weeks_50pct` bin, isotonic) |
 | `hurdle.py` | Strategy A: logistic P(cost > 0) x log-linear amount, smearing, coefficients |
-| `gbm.py` | Strategy B: `HistGradientBoostingRegressor(loss="poisson")` with monotonic constraints |
+| `gbm.py` | Strategy B: `HistGradientBoostingRegressor(loss="poisson")` with monotonic constraints (+ `GBMDollars`, a report-only side check) |
+| `tweedie.py` | Strategy D: `TweedieRegressor(power=1.5, link="log")`, liability-weighted, standardised + imputed + missing flags, alpha tuned in {0.01, 0.1, 1.0} |
+| `tabpfn_model.py` | Strategy G (optional, needs `pip install tabpfn`): TabPFN v2 regressor; no sample weights; Built with PriorLabs-TabPFN (v2 weights: Prior Labs License 1.1, Apache 2.0 + attribution; v2.5/v2.6 weights are non-commercial and not used; no Hugging Face login needed) |
 | `analog.py` | Strategy C: k nearest training county-years (same crop), neighbour range + explanation |
 | `evaluate.py` | tuning, walk-forward 2006-2012, validation 2013-2015, metrics, model choice, report |
 | `final_test.py` | plan section 5 |
